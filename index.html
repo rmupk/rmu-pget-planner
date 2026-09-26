@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Seat &amp; Resource Planner — RMU PGET</title>
+<meta name="theme-color" content="#0C4A37">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Seat &amp; Resource Planner">
+<script>
+  // Builds a Web App Manifest at runtime so "Add to Home Screen" can launch
+  // this page as a standalone app (no address bar) once it's served over
+  // https — Chrome will not apply standalone mode to a file:// page.
+  (function(){
+    var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+      '<rect width="100" height="100" rx="20" fill="%230C4A37"/>' +
+      '<text x="50" y="63" font-family="Georgia, serif" font-size="42" font-weight="700" ' +
+      'fill="%23C79A3E" text-anchor="middle">RMU</text></svg>';
+    var iconDataUrl = 'data:image/svg+xml,' + iconSvg;
+    var manifest = {
+      name: "Seat & Resource Planner — RMU PGET",
+      short_name: "PGET Planner",
+      start_url: ".",
+      display: "standalone",
+      orientation: "portrait",
+      background_color: "#0C4A37",
+      theme_color: "#0C4A37",
+      icons: [{ src: iconDataUrl, sizes: "any", type: "image/svg+xml" }]
+    };
+    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    var link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = URL.createObjectURL(blob);
+    document.head.appendChild(link);
+  })();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --ink:#152420;
+    --ink-soft:#4b5c54;
+    --paper:#F5F2E8;
+    --paper-raised:#FFFFFF;
+    --line:#E1DBC6;
+    --deep:#0C4A37;
+    --deep-2:#0E5C44;
+    --emerald:#1C8563;
+    --emerald-soft:#E4F0EA;
+    --gold:#C79A3E;
+    --gold-soft:#F7EED9;
+    --brick:#A6432F;
+    --brick-soft:#F6E4DF;
+    --shadow: 0 10px 24px -14px rgba(12,74,55,0.35);
+    --radius-lg: 22px;
+    --radius-md: 14px;
+    --radius-sm: 9px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(circle at 15% -10%, #12604A 0%, #0C4A37 38%, #0A3E2E 100%);
+    font-family:'Manrope', sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding: 0;
+  }
+  ::selection{ background: var(--gold-soft); }
+
+  /* ---- App shell: simulates a phone/app frame ---- */
+  #app{
+    width:100%;
+    max-width:480px;
+    min-height:100vh;
+    background:var(--paper);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    box-shadow: 0 0 60px rgba(0,0,0,0.35);
+    overflow:hidden;
+  }
+
+  /* ---- Header ---- */
+  header.appbar{
+    background: linear-gradient(155deg, var(--deep) 0%, var(--deep-2) 65%, #146a4f 100%);
+    color:#F5F2E8;
+    padding: 22px 20px 26px;
+    position:relative;
+    overflow:hidden;
+  }
+  header.appbar::after{
+    content:"";
+    position:absolute; right:-40px; top:-60px;
+    width:180px; height:180px; border-radius:50%;
+    background: radial-gradient(circle, rgba(199,154,62,0.35), transparent 70%);
+  }
+  .brand-row{ display:flex; align-items:center; gap:14px; position:relative; z-index:1; }
+  .badge{
+    width:52px; height:52px; border-radius:16px;
+    background: #FBFAF4;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+    box-shadow: 0 6px 16px -6px rgba(0,0,0,0.5);
+    border: 1.5px solid rgba(199,154,62,0.6);
+    padding:5px;
+  }
+  .badge svg{ width:30px; height:30px; }
+  .badge img{ width:100%; height:100%; object-fit:contain; }
+  .badge .fallback{
+    display:none; font-family:'Fraunces', serif; font-weight:700; font-size:15px; color:var(--deep);
+  }
+  .brand-text .eyebrow{
+    font-size:11.5px; letter-spacing:0.02em; color:#CFE3D8; font-weight:600; margin:0 0 2px;
+  }
+  .brand-text h1{
+    font-family:'Fraunces', serif; font-weight:600; font-size:20px; line-height:1.15; margin:0;
+    letter-spacing:0.01em;
+  }
+  .brand-text .sub{ font-size:12.5px; color:#BFE0D0; margin-top:3px; }
+
+  /* ---- Content scroll area ---- */
+  main{
+    flex:1;
+    overflow-y:auto;
+    padding: 18px 18px 100px;
+  }
+  main::-webkit-scrollbar{ width:0; }
+
+  .view{ display:none; animation: fadeUp .35s ease; }
+  .view.active{ display:block; }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  h2.section-title{
+    font-family:'Fraunces', serif;
+    font-size:19px; font-weight:600; color:var(--deep);
+    margin: 2px 0 14px;
+  }
+  p.section-hint{ font-size:13px; color:var(--ink-soft); margin:-10px 0 16px; line-height:1.5; }
+
+  /* ---- Dashboard cards ---- */
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+  .stat-card{
+    background:var(--paper-raised); border-radius:var(--radius-md);
+    padding:14px 14px 12px; border:1px solid var(--line);
+    box-shadow: var(--shadow); cursor:pointer; transition: transform .12s ease;
+  }
+  .stat-card:active{ transform: scale(0.97); }
+  .stat-card .val{ font-family:'Fraunces', serif; font-size:26px; font-weight:600; color:var(--deep); line-height:1; }
+  .stat-card .lbl{ font-size:11.5px; color:var(--ink-soft); margin-top:6px; font-weight:600; }
+  .stat-card.gold .val{ color:#9c7420; }
+  .stat-card.brick .val{ color:var(--brick); }
+
+  .cta-primary{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; padding:14px; border:none; border-radius:var(--radius-md);
+    background: linear-gradient(135deg, var(--deep) 0%, var(--emerald) 100%);
+    color:#fff; font-weight:700; font-size:14.5px; font-family:'Manrope',sans-serif;
+    cursor:pointer; box-shadow: 0 10px 20px -10px rgba(12,74,55,0.6);
+  }
+  .cta-primary:active{ transform: translateY(1px); }
+
+  .alert-list{ margin-top:18px; }
+  .alert-item{
+    display:flex; gap:10px; align-items:flex-start;
+    background:var(--brick-soft); border-radius:var(--radius-sm);
+    padding:10px 12px; margin-bottom:8px; font-size:13px; color:#6b2c1f;
+  }
+  .alert-item svg{ flex-shrink:0; margin-top:1px; }
+  .empty-note{
+    text-align:center; color:var(--ink-soft); font-size:13px; padding:30px 10px;
+    background:var(--paper-raised); border-radius:var(--radius-md); border:1px dashed var(--line);
+  }
+
+  /* ---- Forms ---- */
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; font-weight:700; color:var(--deep); margin-bottom:6px; }
+  .field .helper{ font-size:11.5px; color:var(--ink-soft); margin-top:5px; }
+  input[type=text], input[type=number], select, textarea{
+    width:100%; padding:11px 12px; border-radius:var(--radius-sm);
+    border:1.5px solid var(--line); background:var(--paper-raised);
+    font-family:'Manrope',sans-serif; font-size:14px; color:var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px var(--emerald-soft);
+  }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+  .seg{
+    display:flex; background:var(--paper-raised); border:1.5px solid var(--line);
+    border-radius:var(--radius-sm); overflow:hidden;
+  }
+  .seg button{
+    flex:1; border:none; background:transparent; padding:10px 6px;
+    font-family:'Manrope',sans-serif; font-weight:700; font-size:13px; color:var(--ink-soft);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .seg button.active{ background:var(--deep); color:#fff; }
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--paper-raised); border:1.5px solid var(--line);
+    border-radius:var(--radius-sm); padding:11px 13px;
+  }
+  .toggle-row span{ font-size:13.5px; font-weight:600; }
+
+  .checkbox-chip-row{ display:flex; flex-wrap:wrap; gap:9px; }
+  .chip-checkbox{ position:relative; display:inline-flex; }
+  .chip-checkbox input{ position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
+  .chip-checkbox span{
+    display:inline-flex; align-items:center; gap:6px; padding:9px 15px; border-radius:20px;
+    background:var(--paper-raised); border:1.5px solid var(--line); font-size:13px; font-weight:700;
+    color:var(--ink-soft); transition: all .15s ease;
+  }
+  .chip-checkbox span::before{
+    content:""; width:14px; height:14px; border-radius:5px; border:1.5px solid var(--line);
+    background:#fff; flex-shrink:0; transition: all .15s ease;
+  }
+  .chip-checkbox input:checked + span{ background:var(--brick-soft); border-color:var(--brick); color:#8a3524; }
+  .chip-checkbox input:checked + span::before{
+    background:var(--brick); border-color:var(--brick);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2'%3E%3Cpath d='M5 12l5 5L19 8'/%3E%3C/svg%3E");
+    background-size:10px; background-repeat:no-repeat; background-position:center;
+  }
+  .switch{ position:relative; width:44px; height:25px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch .track{
+    position:absolute; inset:0; background:#D8D2BC; border-radius:20px; cursor:pointer; transition:.2s;
+  }
+  .switch .track::before{
+    content:""; position:absolute; width:19px; height:19px; left:3px; top:3px;
+    background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3);
+  }
+  .switch input:checked + .track{ background: var(--emerald); }
+  .switch input:checked + .track::before{ transform: translateX(19px); }
+
+  fieldset{ border:none; padding:0; margin:0 0 16px; }
+  legend{
+    font-family:'Fraunces', serif; font-size:14.5px; font-weight:600; color:var(--deep);
+    padding:0 0 8px; display:flex; align-items:center; gap:7px;
+  }
+  legend svg{ width:15px; height:15px; }
+  .card-block{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:14px; margin-bottom:14px; box-shadow: var(--shadow);
+  }
+
+  .calc-readout{
+    margin-top:2px; display:flex; align-items:center; justify-content:space-between;
+    background:var(--emerald-soft); border-radius:var(--radius-sm); padding:12px 14px;
+  }
+  .calc-readout .n{ font-family:'Fraunces', serif; font-size:24px; font-weight:700; color:var(--deep); }
+  .calc-readout .t{ font-size:11.5px; color:#2c5c49; font-weight:700; }
+
+  .form-actions{ display:flex; gap:10px; margin-top:4px; }
+  .btn{
+    flex:1; padding:13px; border-radius:var(--radius-sm); border:none; font-weight:700;
+    font-size:13.5px; cursor:pointer; font-family:'Manrope',sans-serif;
+  }
+  .btn-save{ background:linear-gradient(135deg, var(--deep), var(--emerald)); color:#fff; }
+  .btn-clear{ background:var(--paper-raised); color:var(--ink-soft); border:1.5px solid var(--line); }
+
+  /* ---- Records ---- */
+  .search-box{ margin-bottom:14px; position:relative; }
+  .filter-chip-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--emerald-soft); border-radius:var(--radius-sm);
+    padding:10px 14px; margin-bottom:12px; font-size:13px; font-weight:700; color:#1f6b4f;
+  }
+  .filter-chip-banner button{
+    background:none; border:none; color:#1f6b4f; font-weight:700; font-size:12px;
+    cursor:pointer; text-decoration:underline; flex-shrink:0;
+  }
+  .record-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-md);
+    padding:14px; margin-bottom:12px; box-shadow: var(--shadow); cursor:pointer;
+    transition: transform .12s ease;
+  }
+  .record-card:active{ transform: scale(0.985); }
+  .record-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .record-top h3{ font-family:'Fraunces', serif; font-size:16px; margin:0; color:var(--deep); }
+  .record-top .floor-chip{
+    font-size:10.5px; font-weight:700; color:#9c7420; background:var(--gold-soft);
+    padding:3px 9px; border-radius:20px; white-space:nowrap; margin-left:8px;
+  }
+  .record-cap{ font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; }
+  .record-cap b{ color:var(--deep); font-size:15px; font-family:'Fraunces', serif; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{
+    font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px;
+    background:#EFEBD9; color:var(--ink-soft); display:inline-flex; align-items:center; gap:4px;
+  }
+  .chip.warn{ background:var(--brick-soft); color:#8a3524; }
+  .chip.ok{ background:var(--emerald-soft); color:#1f6b4f; }
+
+  /* ---- Reports ---- */
+  .report-btn{
+    display:flex; align-items:center; gap:12px; width:100%;
+    background:var(--paper-raised); border:1.5px solid var(--line); border-radius:var(--radius-md);
+    padding:15px; margin-bottom:12px; cursor:pointer; text-align:left;
+    font-family:'Manrope',sans-serif;
+  }
+  .report-btn .ic{
+    width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .report-btn.excel .ic{ background:var(--emerald-soft); color:var(--emerald); }
+  .report-btn.pdf .ic{ background:var(--brick-soft); color:var(--brick); }
+  .report-btn .txt strong{ display:block; font-size:14px; color:var(--ink); }
+  .report-btn .txt span{ font-size:12px; color:var(--ink-soft); }
+
+  .summary-table{ width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+  .summary-table th, .summary-table td{ padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; }
+  .summary-table th{ color:var(--deep); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; }
+
+  /* ---- Bottom nav ---- */
+  nav.bottombar{
+    position:sticky; bottom:0; left:0; right:0;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(10px);
+    border-top:1px solid var(--line);
+    display:flex; justify-content:space-around; padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+  }
+  .nav-btn{
+    background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px;
+    color:#93998f; cursor:pointer; padding:6px 10px; border-radius:12px; font-family:'Manrope',sans-serif;
+  }
+  .nav-btn svg{ width:21px; height:21px; }
+  .nav-btn span{ font-size:10px; font-weight:700; }
+  .nav-btn.active{ color:var(--deep); }
+  .nav-btn.active svg{ filter: drop-shadow(0 2px 4px rgba(12,74,55,0.3)); }
+
+  .toast{
+    position:fixed; bottom:88px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--deep); color:#fff; padding:11px 18px; border-radius:30px; font-size:13px;
+    font-weight:600; opacity:0; pointer-events:none; transition:.25s ease; z-index:50;
+    box-shadow: 0 10px 24px -8px rgba(0,0,0,0.4); white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (min-width:481px){
+    body{ padding:24px 0; }
+    #app{ min-height:calc(100vh - 48px); border-radius:32px; }
+  }
+
+  @media (min-width:900px){
+    body{ padding:0; align-items:flex-start; }
+    #app{
+      max-width:1080px; width:100%; min-height:100vh; border-radius:0;
+      box-shadow:none;
+    }
+    header.appbar{ padding:22px 40px 26px; }
+    main{ padding:26px 40px 60px; }
+    .view{ max-width:720px; margin:0 auto; }
+    .view#view-dashboard, .view#view-records{ max-width:920px; }
+    .stat-grid{ grid-template-columns: repeat(4, 1fr); }
+    #records-list{ display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; }
+    #records-list .record-card{ margin-bottom:0; }
+
+    nav.bottombar{
+      order:-1; position:sticky; top:0; bottom:auto;
+      border-top:none; border-bottom:1px solid var(--line);
+      justify-content:flex-start; gap:6px; padding:12px 40px;
+    }
+    .nav-btn{ flex-direction:row; gap:8px; padding:8px 16px; }
+    .nav-btn span{ font-size:12.5px; }
+    .toast{ bottom:24px; }
+  }
+
+  @media (min-width:1120px){
+    #app{ box-shadow: 0 0 60px rgba(0,0,0,0.35); margin:24px auto; min-height:calc(100vh - 48px); }
+    body{ padding:24px 0; align-items:flex-start; justify-content:center; }
+  }
+
+  /* ---- Login screen ---- */
+  .login-screen{
+    position:fixed; inset:0; z-index:200; display:none;
+    background: radial-gradient(circle at 15% -10%, #12604A 0%, #0C4A37 38%, #0A3E2E 100%);
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .login-card{
+    width:100%; max-width:360px; background:var(--paper-raised);
+    border-radius:var(--radius-lg); padding:30px 26px 26px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5);
+    text-align:center; position:relative;
+  }
+  .login-close{
+    position:absolute; top:14px; right:14px; background:none; border:none;
+    color:var(--ink-soft); cursor:pointer; width:28px; height:28px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .login-card .badge{ margin:0 auto 16px; }
+  .login-card h1{
+    font-family:'Fraunces', serif; font-size:20px; font-weight:600; color:var(--deep); margin:0 0 4px;
+  }
+  .login-card p.sub{ font-size:13px; color:var(--ink-soft); margin:0 0 20px; }
+  .login-card .field{ text-align:left; }
+  .login-error{
+    color:var(--brick); font-size:12.5px; font-weight:700; min-height:16px; margin:2px 0 10px;
+  }
+  .header-actions{ position:absolute; top:20px; right:18px; z-index:2; }
+  .icon-btn{
+    background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25);
+    border-radius:10px; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+    color:#F5F2E8; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <button class="login-close" onclick="closeLoginModal()" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="badge">
+      <img src="https://upload.wikimedia.org/wikipedia/en/5/58/Rawalpindi_Medical_University_logo.png"
+           alt="Rawalpindi Medical University logo"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <span class="fallback">RMU</span>
+    </div>
+    <h1>Seat &amp; Resource Planner</h1>
+    <p class="sub">Sign in to manage the PGET hall survey</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="text" id="login-email" placeholder="you@rmur.edu.pk" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin();">
+    </div>
+    <p class="login-error" id="login-error"></p>
+    <button class="cta-primary" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<div id="app">
+
+  <header class="appbar">
+    <div class="header-actions">
+      <button class="icon-btn" id="auth-toggle-btn" onclick="handleAuthToggle()" title="Sign in">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></svg>
+      </button>
+    </div>
+    <div class="brand-row">
+      <div class="badge">
+        <img src="https://upload.wikimedia.org/wikipedia/en/5/58/Rawalpindi_Medical_University_logo.png"
+             alt="Rawalpindi Medical University logo"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <span class="fallback">RMU</span>
+      </div>
+      <div class="brand-text">
+        <p class="eyebrow">RAWALPINDI MEDICAL UNIVERSITY</p>
+        <h1>Seat &amp; Resource Planner</h1>
+        <p class="sub">PGET Examination Hall Survey</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <h2 class="section-title">Overview</h2>
+      <div class="stat-grid">
+        <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-halls">0</div><div class="lbl">Halls surveyed</div></div>
+        <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-capacity">0</div><div class="lbl">Total seating capacity</div></div>
+        <div class="stat-card gold" onclick="goToFiltered('nowater')"><div class="val" id="stat-water">0</div><div class="lbl">Halls without water facility</div></div>
+        <div class="stat-card brick" onclick="goToFiltered('issues')"><div class="val" id="stat-issues">0</div><div class="lbl">Halls needing attention</div></div>
+      </div>
+
+      <button class="cta-primary" onclick="goSurvey()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Survey a New Hall
+      </button>
+
+      <div class="alert-list" id="attention-list"></div>
+    </section>
+
+    <!-- SURVEY FORM -->
+    <section class="view" id="view-survey">
+      <h2 class="section-title" id="survey-title">Hall Survey</h2>
+      <p class="section-hint">Enter the physical details of the hall. Seating capacity is calculated automatically as you type.</p>
+
+      <div class="card-block">
+        <fieldset>
+          <legend>Hall identity</legend>
+          <div class="field">
+            <label>Hall name</label>
+            <input type="text" id="f-hallName" placeholder="e.g. Anatomy Hall, New Block">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Floor</label>
+            <input type="text" id="f-floor" placeholder="e.g. Ground, 1st Floor">
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="card-block">
+        <fieldset style="margin-bottom:0;">
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="18" height="7" rx="1.5"/><path d="M5 10V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M5 17v3M19 17v3"/></svg>
+            Seating arrangement
+          </legend>
+          <div class="seg" id="seat-type-seg">
+            <button type="button" class="active" data-type="bench" onclick="setSeatType('bench')">Benches</button>
+            <button type="button" data-type="chair" onclick="setSeatType('chair')">Chairs</button>
+          </div>
+          <div style="height:12px;"></div>
+          <div class="row-2">
+            <div class="field">
+              <label>Total rows</label>
+              <input type="number" min="0" id="f-rows" placeholder="0" oninput="recalc()">
+            </div>
+            <div class="field">
+              <label>Total columns</label>
+              <input type="number" min="0" id="f-cols" placeholder="0" oninput="recalc()">
+            </div>
+          </div>
+          <div class="field" id="wrap-benchCap">
+            <label>Seating capacity of one bench</label>
+            <input type="number" min="0" id="f-benchCap" placeholder="e.g. 3" oninput="recalc()">
+          </div>
+          <div class="field" id="wrap-chairRow" style="display:none;">
+            <label>Number of chairs in one row</label>
+            <input type="number" min="0" id="f-chairRow" placeholder="e.g. 12" oninput="recalc()">
+          </div>
+          <div class="field">
+            <label>Correction (+ / −)</label>
+            <input type="number" id="f-correction" placeholder="0" value="0" oninput="recalc()">
+            <p class="helper">Add or subtract seats to correct for pillars, broken furniture, or field-verified counts.</p>
+          </div>
+          <div class="calc-readout">
+            <div>
+              <div class="n" id="calc-total">0</div>
+              <div class="t">FINAL SEATING CAPACITY</div>
+            </div>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="card-block">
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5c0 3-5 3-5 8M12 2a5 5 0 0 0-5 5c0 3 5 3 5 8M12 15v7"/></svg>
+            Fans
+          </legend>
+          <div class="row-2">
+            <div class="field">
+              <label>Total fans</label>
+              <input type="number" min="0" id="f-fansTotal" placeholder="0" oninput="recalcFans()">
+            </div>
+            <div class="field">
+              <label>Working fans</label>
+              <input type="number" min="0" id="f-fansWorking" placeholder="0" oninput="recalcFans()">
+            </div>
+          </div>
+        </fieldset>
+        <div class="calc-readout" style="background:var(--gold-soft);">
+          <div>
+            <div class="n" id="calc-fansNonWorking" style="color:#9c7420;">0</div>
+            <div class="t" style="color:#9c7420;">NON-WORKING FANS (AUTO)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.3 1 2.5h6c0-1.2.4-1.9 1-2.5A6 6 0 0 0 12 3Z"/></svg>
+            Lighting
+          </legend>
+          <div class="field" style="margin-bottom:0;">
+            <label>Condition of lights</label>
+            <select id="f-lights">
+              <option value="All Working">All lights working</option>
+              <option value="Partially Working">Some lights not working</option>
+              <option value="Not Working">Lights not working</option>
+            </select>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="card-block">
+        <fieldset>
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="10" rx="2"/><path d="M6 16v3M14 16v3M2 10h20"/></svg>
+            Air conditioning
+          </legend>
+          <div class="row-2">
+            <div class="field">
+              <label>Total ACs</label>
+              <input type="number" min="0" id="f-acTotal" placeholder="0" oninput="recalcFans()">
+            </div>
+            <div class="field">
+              <label>Working ACs</label>
+              <input type="number" min="0" id="f-acWorking" placeholder="0" oninput="recalcFans()">
+            </div>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="card-block">
+        <fieldset style="margin-bottom:0;">
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.7 6.3-8.4 8.4a2 2 0 0 0-.5.9L5 19l3.4-.8a2 2 0 0 0 .9-.5l8.4-8.4a2 2 0 0 0 0-2.8l-.2-.2a2 2 0 0 0-2.8 0Z"/></svg>
+            Repairs required
+          </legend>
+          <div class="checkbox-chip-row">
+            <label class="chip-checkbox">
+              <input type="checkbox" id="f-repair-electrical" value="Electrical">
+              <span>Electrical</span>
+            </label>
+            <label class="chip-checkbox">
+              <input type="checkbox" id="f-repair-seats" value="Seats">
+              <span>Seats</span>
+            </label>
+            <label class="chip-checkbox">
+              <input type="checkbox" id="f-repair-structure" value="Structure">
+              <span>Structure</span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="card-block">
+        <div class="toggle-row">
+          <span>Water facility available</span>
+          <label class="switch">
+            <input type="checkbox" id="f-water">
+            <span class="track"></span>
+          </label>
+        </div>
+        <div class="toggle-row" style="margin-top:10px;">
+          <span>Hall signage complete</span>
+          <label class="switch">
+            <input type="checkbox" id="f-signage">
+            <span class="track"></span>
+          </label>
+        </div>
+        <div class="toggle-row" style="margin-top:10px;">
+          <span>Site ready</span>
+          <label class="switch">
+            <input type="checkbox" id="f-siteReady">
+            <span class="track"></span>
+          </label>
+        </div>
+        <div class="field" style="margin-top:12px; margin-bottom:0;">
+          <label>Remarks (optional)</label>
+          <textarea id="f-remarks" rows="2" placeholder="Any other notes about this hall"></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-clear" onclick="clearForm()">Clear</button>
+        <button class="btn btn-save" id="btn-save" onclick="saveRecord()">Save Hall</button>
+      </div>
+    </section>
+
+    <!-- RECORDS -->
+    <section class="view" id="view-records">
+      <h2 class="section-title">Hall Records</h2>
+      <div id="filter-banner"></div>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Search by hall name or floor…" oninput="renderRecords()">
+      </div>
+      <div id="records-list"></div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="view" id="view-reports">
+      <h2 class="section-title">Reports</h2>
+      <p class="section-hint">Export every surveyed hall as a spreadsheet or a printable PDF report.</p>
+
+      <button class="report-btn excel" onclick="exportExcel()">
+        <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l6 6M15 13l-6 6"/></svg></span>
+        <span class="txt"><strong>Export to Excel</strong><span>.xlsx spreadsheet of all hall data</span></span>
+      </button>
+
+      <button class="report-btn pdf" onclick="exportPDF()">
+        <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h1M9 12h1M9 18h1"/></svg></span>
+        <span class="txt"><strong>Export to PDF</strong><span>Printable report, ready to share</span></span>
+      </button>
+
+      <div class="card-block" style="margin-top:8px;">
+        <fieldset style="margin-bottom:0;">
+          <legend>Preview</legend>
+          <div id="preview-wrap">
+            <p class="section-hint" style="margin:0;">No halls surveyed yet.</p>
+          </div>
+        </fieldset>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="bottombar">
+    <button class="nav-btn active" data-view="dashboard" onclick="goTo('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-btn" data-view="survey" onclick="goSurvey()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M9 3h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1V4a1 1 0 0 1 1-1Z"/><path d="M9 12h6M9 16h4"/></svg>
+      <span>Survey</span>
+    </button>
+    <button class="nav-btn" data-view="records" onclick="goToFiltered('all')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M4 6h16M4 12h16M4 18h9"/></svg>
+      <span>Records</span>
+    </button>
+    <button class="nav-btn" data-view="reports" onclick="goTo('reports')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      <span>Reports</span>
+    </button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ---------------- firebase ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBgxIwW2z321GstEf77QrguJdBe1yzJNGk",
+  authDomain: "rmu-pget-planner.firebaseapp.com",
+  projectId: "rmu-pget-planner",
+  storageBucket: "rmu-pget-planner.firebasestorage.app",
+  messagingSenderId: "1037846308839",
+  appId: "1:1037846308839:web:03a6096e69ee6b5d5e7f42"
+};
+
+let auth = null, db = null, hallsCollection = null, firebaseReady = false;
+try{
+  if(typeof firebase === 'undefined') throw new Error('Firebase SDK did not load');
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+  hallsCollection = db.collection('halls');
+  firebaseReady = true;
+}catch(err){
+  console.error(err);
+}
+
+function showConnectionError(){
+  if(document.getElementById('conn-error-banner')) return;
+  const el = document.createElement('div');
+  el.id = 'conn-error-banner';
+  el.style.cssText = 'position:fixed;inset:0;z-index:999;background:#0A3E2E;color:#F5F2E8;'
+    + 'display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;'
+    + 'font-family:Manrope,sans-serif;font-size:14px;line-height:1.6;';
+  el.innerHTML = "Couldn't connect to the data service.<br>Please check your internet connection and reload the page.";
+  document.body.appendChild(el);
+}
+
+let halls = [];
+let editingId = null;
+let seatType = 'bench';
+let recordsFilter = 'all'; // 'all' | 'nowater' | 'issues'
+let unsubscribeHalls = null;
+let isAuthed = false;
+
+/* ---------------- auth ---------------- */
+function openLoginModal(){
+  document.getElementById('login-screen').style.display = 'flex';
+}
+function closeLoginModal(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('login-error').textContent = '';
+}
+
+function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if(!email || !password){
+    errEl.textContent = 'Enter both email and password.';
+    return;
+  }
+  auth.signInWithEmailAndPassword(email, password).catch(() => {
+    errEl.textContent = 'Incorrect email or password.';
+  });
+}
+
+function doLogout(){
+  if(firebaseReady) auth.signOut();
+  showToast('Signed out — you can still view records');
+}
+
+function handleAuthToggle(){
+  if(!firebaseReady){ showConnectionError(); return; }
+  if(isAuthed) doLogout(); else openLoginModal();
+}
+
+function updateAuthUI(){
+  const btn = document.getElementById('auth-toggle-btn');
+  if(isAuthed){
+    btn.title = 'Sign out';
+    btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>';
+  } else {
+    btn.title = 'Sign in to edit';
+    btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></svg>';
+  }
+}
+
+if(firebaseReady){
+  auth.onAuthStateChanged(user => {
+    isAuthed = !!user;
+    updateAuthUI();
+    if(user){
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-password').value = '';
+      closeLoginModal();
+      showToast('Signed in');
+    }
+  });
+} else {
+  showConnectionError();
+}
+
+/* ---------------- shared data (Firestore) — public read, no login required ---------------- */
+function startHallsListener(){
+  if(!firebaseReady) return;
+  if(unsubscribeHalls) unsubscribeHalls();
+  unsubscribeHalls = hallsCollection.onSnapshot(snapshot => {
+    halls = snapshot.docs.map(doc => doc.data());
+    renderAll();
+  }, () => {
+    showToast('Could not sync data — check your connection');
+  });
+}
+
+async function saveHallDoc(record){
+  if(!firebaseReady){ showConnectionError(); return false; }
+  try{
+    await hallsCollection.doc(record.id).set(record);
+    return true;
+  }catch(e){
+    showToast('Could not save — please sign in and retry');
+    return false;
+  }
+}
+
+async function deleteHallDoc(id){
+  if(!firebaseReady){ showConnectionError(); return; }
+  try{
+    await hallsCollection.doc(id).delete();
+  }catch(e){
+    showToast('Could not delete — please sign in and retry');
+  }
+}
+
+/* ---------------- navigation ---------------- */
+function goSurvey(){
+  if(!isAuthed){ openLoginModal(); return; }
+  clearForm();
+  goTo('survey');
+}
+
+function goTo(view){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  if(view === 'records') renderRecords();
+  if(view === 'reports') renderPreview();
+  if(view === 'dashboard') renderDashboard();
+  document.querySelector('main').scrollTop = 0;
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function isHallFlagged(h){
+  return h.fansNonWorking > 0 || h.acNonWorking > 0 || h.lights !== 'All Working'
+    || !h.signage || !h.siteReady || (h.repairs && h.repairs.length > 0);
+}
+
+function goToFiltered(filter){
+  recordsFilter = filter;
+  goTo('records');
+}
+
+/* ---------------- form logic ---------------- */
+function setSeatType(type){
+  seatType = type;
+  document.querySelectorAll('#seat-type-seg button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  document.getElementById('wrap-benchCap').style.display = type === 'bench' ? 'block' : 'none';
+  document.getElementById('wrap-chairRow').style.display = type === 'chair' ? 'block' : 'none';
+  recalc();
+}
+
+function recalc(){
+  const rows = parseFloat(document.getElementById('f-rows').value) || 0;
+  const cols = parseFloat(document.getElementById('f-cols').value) || 0;
+  const correction = parseFloat(document.getElementById('f-correction').value) || 0;
+  const perUnit = seatType === 'bench'
+    ? (parseFloat(document.getElementById('f-benchCap').value) || 0)
+    : (parseFloat(document.getElementById('f-chairRow').value) || 0);
+  const total = Math.max(0, Math.round(rows * cols * perUnit + correction));
+  document.getElementById('calc-total').textContent = total;
+  return total;
+}
+
+function recalcFans(){
+  const total = parseFloat(document.getElementById('f-fansTotal').value) || 0;
+  const working = parseFloat(document.getElementById('f-fansWorking').value) || 0;
+  const nonWorking = Math.max(0, total - working);
+  document.getElementById('calc-fansNonWorking').textContent = nonWorking;
+  return nonWorking;
+}
+
+function getRepairs(){
+  const ids = ['f-repair-electrical','f-repair-seats','f-repair-structure'];
+  return ids.map(id => document.getElementById(id))
+            .filter(el => el.checked)
+            .map(el => el.value);
+}
+function setRepairs(list){
+  const ids = ['f-repair-electrical','f-repair-seats','f-repair-structure'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    el.checked = Array.isArray(list) && list.includes(el.value);
+  });
+}
+
+function clearForm(){
+  editingId = null;
+  document.getElementById('survey-title').textContent = 'Hall Survey';
+  document.getElementById('btn-save').textContent = 'Save Hall';
+  ['f-hallName','f-floor','f-rows','f-cols','f-benchCap','f-chairRow','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-correction').value = 0;
+  document.getElementById('f-lights').value = 'All Working';
+  document.getElementById('f-water').checked = false;
+  document.getElementById('f-signage').checked = false;
+  document.getElementById('f-siteReady').checked = false;
+  setRepairs([]);
+  setSeatType('bench');
+  recalc(); recalcFans();
+}
+
+function validateForm(){
+  const name = document.getElementById('f-hallName').value.trim();
+  if(!name){ showToast('Hall name is required'); return false; }
+  return true;
+}
+
+async function saveRecord(){
+  if(!isAuthed){ openLoginModal(); return; }
+  if(!validateForm()) return;
+  const capacity = recalc();
+  const fansNonWorking = recalcFans();
+  const acTotal = parseFloat(document.getElementById('f-acTotal').value) || 0;
+  const acWorking = parseFloat(document.getElementById('f-acWorking').value) || 0;
+
+  const record = {
+    id: editingId || ('h' + Date.now()),
+    hallName: document.getElementById('f-hallName').value.trim(),
+    floor: document.getElementById('f-floor').value.trim(),
+    seatType: seatType,
+    rows: parseFloat(document.getElementById('f-rows').value) || 0,
+    cols: parseFloat(document.getElementById('f-cols').value) || 0,
+    benchCap: parseFloat(document.getElementById('f-benchCap').value) || 0,
+    chairRow: parseFloat(document.getElementById('f-chairRow').value) || 0,
+    correction: parseFloat(document.getElementById('f-correction').value) || 0,
+    capacity: capacity,
+    fansTotal: parseFloat(document.getElementById('f-fansTotal').value) || 0,
+    fansWorking: parseFloat(document.getElementById('f-fansWorking').value) || 0,
+    fansNonWorking: fansNonWorking,
+    lights: document.getElementById('f-lights').value,
+    acTotal: acTotal,
+    acWorking: acWorking,
+    acNonWorking: Math.max(0, acTotal - acWorking),
+    water: document.getElementById('f-water').checked,
+    signage: document.getElementById('f-signage').checked,
+    siteReady: document.getElementById('f-siteReady').checked,
+    repairs: getRepairs(),
+    remarks: document.getElementById('f-remarks').value.trim(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const wasEditing = !!editingId;
+  const ok = await saveHallDoc(record);
+  if(!ok) return;
+  showToast(wasEditing ? 'Hall updated' : 'Hall saved');
+  clearForm();
+  goTo('records');
+}
+
+function editRecord(id){
+  if(!isAuthed){ openLoginModal(); return; }
+  const h = halls.find(x => x.id === id);
+  if(!h) return;
+  editingId = id;
+  document.getElementById('survey-title').textContent = 'Edit Hall';
+  document.getElementById('btn-save').textContent = 'Update Hall';
+  document.getElementById('f-hallName').value = h.hallName;
+  document.getElementById('f-floor').value = h.floor;
+  document.getElementById('f-rows').value = h.rows;
+  document.getElementById('f-cols').value = h.cols;
+  document.getElementById('f-benchCap').value = h.benchCap;
+  document.getElementById('f-chairRow').value = h.chairRow;
+  document.getElementById('f-correction').value = h.correction;
+  document.getElementById('f-fansTotal').value = h.fansTotal;
+  document.getElementById('f-fansWorking').value = h.fansWorking;
+  document.getElementById('f-lights').value = h.lights;
+  document.getElementById('f-acTotal').value = h.acTotal;
+  document.getElementById('f-acWorking').value = h.acWorking;
+  document.getElementById('f-water').checked = h.water;
+  document.getElementById('f-signage').checked = !!h.signage;
+  document.getElementById('f-siteReady').checked = !!h.siteReady;
+  setRepairs(h.repairs);
+  document.getElementById('f-remarks').value = h.remarks || '';
+  setSeatType(h.seatType);
+  recalc(); recalcFans();
+  goTo('survey');
+}
+
+async function deleteRecord(id, evt){
+  if(evt) evt.stopPropagation();
+  if(!isAuthed){ openLoginModal(); return; }
+  if(!confirm('Delete this hall record? This cannot be undone.')) return;
+  await deleteHallDoc(id);
+  showToast('Hall deleted');
+}
+
+/* ---------------- rendering ---------------- */
+function renderAll(){
+  renderDashboard();
+  renderRecords();
+  renderPreview();
+}
+
+function renderDashboard(){
+  document.getElementById('stat-halls').textContent = halls.length;
+  document.getElementById('stat-capacity').textContent = halls.reduce((s,h) => s + h.capacity, 0);
+  document.getElementById('stat-water').textContent = halls.filter(h => !h.water).length;
+
+  const issues = halls.filter(isHallFlagged);
+  document.getElementById('stat-issues').textContent = issues.length;
+
+  const list = document.getElementById('attention-list');
+  if(halls.length === 0){
+    list.innerHTML = '<div class="empty-note">No halls surveyed yet. Tap "Survey a New Hall" to begin.</div>';
+    return;
+  }
+  if(issues.length === 0){
+    list.innerHTML = '<div class="empty-note">All surveyed halls are in good working order.</div>';
+    return;
+  }
+  list.innerHTML = issues.map(h => {
+    const bits = [];
+    if(h.fansNonWorking > 0) bits.push(h.fansNonWorking + ' fan(s) not working');
+    if(h.acNonWorking > 0) bits.push(h.acNonWorking + ' AC(s) not working');
+    if(h.lights !== 'All Working') bits.push(h.lights.toLowerCase());
+    if(!h.signage) bits.push('signage pending');
+    if(!h.siteReady) bits.push('site not ready');
+    if(h.repairs && h.repairs.length) bits.push('repairs needed: ' + h.repairs.join(', '));
+    return `<div class="alert-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 9v4M12 17h.01M10.3 3.9 2.6 18a1.5 1.5 0 0 0 1.3 2.2h16.2a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z"/></svg>
+      <span><b>${escapeHtml(h.hallName)}</b> — ${bits.join(', ')}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderRecords(){
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const list = document.getElementById('records-list');
+  const banner = document.getElementById('filter-banner');
+
+  const filterLabels = {
+    all: null,
+    water: 'Showing halls with water facility',
+    nowater: 'Showing halls without water facility',
+    issues: 'Showing halls needing attention'
+  };
+  if(filterLabels[recordsFilter]){
+    banner.innerHTML = `<div class="filter-chip-banner">
+      <span>${filterLabels[recordsFilter]}</span>
+      <button onclick="goToFiltered('all')">Clear</button>
+    </div>`;
+  } else {
+    banner.innerHTML = '';
+  }
+
+  let base = halls;
+  if(recordsFilter === 'water') base = halls.filter(h => h.water);
+  if(recordsFilter === 'nowater') base = halls.filter(h => !h.water);
+  if(recordsFilter === 'issues') base = halls.filter(isHallFlagged);
+
+  const filtered = base.filter(h => (h.hallName + ' ' + h.floor).toLowerCase().includes(q));
+
+  if(halls.length === 0){
+    list.innerHTML = '<div class="empty-note">No halls surveyed yet. Tap "Survey" below to add your first hall.</div>';
+    return;
+  }
+  if(filtered.length === 0){
+    list.innerHTML = base.length === 0
+      ? '<div class="empty-note">No halls match this filter right now.</div>'
+      : '<div class="empty-note">No halls match your search.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(h => `
+    <div class="record-card" onclick="editRecord('${h.id}')">
+      <div class="record-top">
+        <h3>${escapeHtml(h.hallName)}</h3>
+        <span class="floor-chip">${escapeHtml(h.floor || '—')}</span>
+      </div>
+      <div class="record-cap">Seating capacity: <b>${h.capacity}</b> · ${h.seatType === 'bench' ? 'Benches' : 'Chairs'}</div>
+      <div class="chip-row">
+        <span class="chip ${h.fansNonWorking > 0 ? 'warn' : 'ok'}">${h.fansWorking}/${h.fansTotal} fans</span>
+        <span class="chip ${h.acNonWorking > 0 ? 'warn' : 'ok'}">${h.acWorking}/${h.acTotal} ACs</span>
+        <span class="chip ${h.lights === 'All Working' ? 'ok' : 'warn'}">${escapeHtml(h.lights)}</span>
+        <span class="chip ${h.water ? 'ok' : 'warn'}">${h.water ? 'Water available' : 'No water'}</span>
+        <span class="chip ${h.signage ? 'ok' : 'warn'}">${h.signage ? 'Signage complete' : 'Signage pending'}</span>
+        <span class="chip ${h.siteReady ? 'ok' : 'warn'}">${h.siteReady ? 'Site ready' : 'Site not ready'}</span>
+        <span class="chip ${(h.repairs && h.repairs.length) ? 'warn' : 'ok'}">${(h.repairs && h.repairs.length) ? 'Repairs: ' + h.repairs.join(', ') : 'No repairs needed'}</span>
+      </div>
+      <div style="text-align:right; margin-top:10px;">
+        <button onclick="deleteRecord('${h.id}', event)" style="background:none;border:none;color:#A6432F;font-size:12px;font-weight:700;cursor:pointer;">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderPreview(){
+  const wrap = document.getElementById('preview-wrap');
+  if(halls.length === 0){
+    wrap.innerHTML = '<p class="section-hint" style="margin:0;">No halls surveyed yet.</p>';
+    return;
+  }
+  wrap.innerHTML = `<table class="summary-table">
+    <tr><th>Hall</th><th>Floor</th><th>Capacity</th></tr>
+    ${halls.map(h => `<tr><td>${escapeHtml(h.hallName)}</td><td>${escapeHtml(h.floor||'—')}</td><td>${h.capacity}</td></tr>`).join('')}
+    <tr><td colspan="2" style="font-weight:700;">Total</td><td style="font-weight:700;">${halls.reduce((s,h)=>s+h.capacity,0)}</td></tr>
+  </table>`;
+}
+
+function escapeHtml(s){
+  return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------------- export: excel ---------------- */
+function exportExcel(){
+  if(halls.length === 0){ showToast('No records to export yet'); return; }
+  const rows = halls.map(h => ({
+    'Hall Name': h.hallName,
+    'Floor': h.floor,
+    'Seating Type': h.seatType === 'bench' ? 'Benches' : 'Chairs',
+    'Rows': h.rows,
+    'Columns': h.cols,
+    'Capacity per Bench': h.seatType === 'bench' ? h.benchCap : '',
+    'Chairs per Row': h.seatType === 'chair' ? h.chairRow : '',
+    'Total Seating Capacity': h.capacity,
+    'Total Fans': h.fansTotal,
+    'Working Fans': h.fansWorking,
+    'Non-Working Fans': h.fansNonWorking,
+    'Lights Condition': h.lights,
+    'Total ACs': h.acTotal,
+    'Working ACs': h.acWorking,
+    'Non-Working ACs': h.acNonWorking,
+    'Water Facility': h.water ? 'Yes' : 'No',
+    'Hall Signage Complete': h.signage ? 'Yes' : 'No',
+    'Site Ready': h.siteReady ? 'Yes' : 'No',
+    'Repairs Required': (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None',
+    'Remarks': h.remarks,
+    'Last Updated': new Date(h.updatedAt).toLocaleString()
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, k.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'PGET Hall Survey');
+  XLSX.writeFile(wb, 'RMU_PGET_Hall_Survey.xlsx');
+  showToast('Excel file downloaded');
+}
+
+/* ---------------- export: pdf ---------------- */
+function exportPDF(){
+  if(halls.length === 0){ showToast('No records to export yet'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  doc.setFillColor(12, 74, 55);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Rawalpindi Medical University — PGET Seating & Resource Survey', 14, 10);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Generated on ' + new Date().toLocaleString(), 14, 17);
+
+  const totalCapacity = halls.reduce((s,h) => s + h.capacity, 0);
+  doc.setTextColor(30,30,30);
+  doc.setFontSize(10);
+  doc.text(`Halls surveyed: ${halls.length}     Total seating capacity: ${totalCapacity}     Halls with water facility: ${halls.filter(h=>h.water).length}`, 14, 30);
+
+  doc.autoTable({
+    startY: 35,
+    styles: { fontSize: 7.5, cellPadding: 2 },
+    headStyles: { fillColor: [12,74,55], textColor: 255 },
+    alternateRowStyles: { fillColor: [244,241,232] },
+    head: [[ 'Hall', 'Floor', 'Type', 'Rows', 'Cols', 'Capacity',
+              'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Water', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
+    body: halls.map(h => [
+      h.hallName, h.floor, h.seatType === 'bench' ? 'Bench' : 'Chair', h.rows, h.cols, h.capacity,
+      `${h.fansWorking}/${h.fansTotal}`, h.fansNonWorking, h.lights,
+      `${h.acWorking}/${h.acTotal}`, h.acNonWorking, h.water ? 'Yes' : 'No',
+      h.signage ? 'Yes' : 'No', h.siteReady ? 'Yes' : 'No',
+      (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None', h.remarks || ''
+    ])
+  });
+
+  doc.save('RMU_PGET_Hall_Survey_Report.pdf');
+  showToast('PDF report downloaded');
+}
+
+/* ---------------- init ---------------- */
+setSeatType('bench');
+startHallsListener();
+</script>
+</body>
+</html>
