@@ -3,39 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>Seat &amp; Resource Planner — RMU PGET</title>
+<title>Venue Management System — RMU PGET</title>
 <meta name="theme-color" content="#0C4A37">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Seat &amp; Resource Planner">
-<script>
-  // Builds a Web App Manifest at runtime so "Add to Home Screen" can launch
-  // this page as a standalone app (no address bar) once it's served over
-  // https — Chrome will not apply standalone mode to a file:// page.
-  (function(){
-    var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-      '<rect width="100" height="100" rx="20" fill="%230C4A37"/>' +
-      '<text x="50" y="63" font-family="Georgia, serif" font-size="42" font-weight="700" ' +
-      'fill="%23C79A3E" text-anchor="middle">RMU</text></svg>';
-    var iconDataUrl = 'data:image/svg+xml,' + iconSvg;
-    var manifest = {
-      name: "Seat & Resource Planner — RMU PGET",
-      short_name: "PGET Planner",
-      start_url: ".",
-      display: "standalone",
-      orientation: "portrait",
-      background_color: "#0C4A37",
-      theme_color: "#0C4A37",
-      icons: [{ src: iconDataUrl, sizes: "any", type: "image/svg+xml" }]
-    };
-    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    var link = document.createElement('link');
-    link.rel = 'manifest';
-    link.href = URL.createObjectURL(blob);
-    document.head.appendChild(link);
-  })();
-</script>
+<meta name="apple-mobile-web-app-title" content="Venue Management System">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -412,6 +388,16 @@
   .login-error{
     color:var(--brick); font-size:12.5px; font-weight:700; min-height:16px; margin:2px 0 10px;
   }
+  .btn-install{
+    width:100%; margin-top:10px; padding:11px; border-radius:var(--radius-sm);
+    border:1.5px solid var(--line); background:var(--paper-raised); color:var(--deep);
+    font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center;
+    justify-content:center; gap:7px; font-family:'Manrope',sans-serif;
+  }
+  .install-hint{
+    font-size:12px; color:#1f6b4f; background:var(--emerald-soft); border-radius:10px;
+    padding:9px 12px; margin-top:10px; display:none; text-align:left; font-weight:600; line-height:1.5;
+  }
   .header-actions{ position:absolute; top:20px; right:18px; z-index:2; }
   .icon-btn{
     background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25);
@@ -433,7 +419,7 @@
            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
       <span class="fallback">RMU</span>
     </div>
-    <h1>Seat &amp; Resource Planner</h1>
+    <h1>Venue Management System</h1>
     <p class="sub">Sign in to manage the PGET hall survey</p>
     <div class="field">
       <label>Email</label>
@@ -446,6 +432,11 @@
     </div>
     <p class="login-error" id="login-error"></p>
     <button class="cta-primary" onclick="doLogin()">Sign In</button>
+    <button class="btn-install" onclick="installApp()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      Install App
+    </button>
+    <p class="install-hint" id="install-hint"></p>
   </div>
 </div>
 
@@ -466,7 +457,7 @@
       </div>
       <div class="brand-text">
         <p class="eyebrow">RAWALPINDI MEDICAL UNIVERSITY</p>
-        <h1>Seat &amp; Resource Planner</h1>
+        <h1>Venue Management System</h1>
         <p class="sub">PGET Examination Hall Survey</p>
       </div>
     </div>
@@ -481,6 +472,8 @@
         <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-halls">0</div><div class="lbl">Halls surveyed</div></div>
         <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-capacity">0</div><div class="lbl">Total seating capacity</div></div>
         <div class="stat-card gold" onclick="goToFiltered('nowater')"><div class="val" id="stat-water">0</div><div class="lbl">Halls without water facility</div></div>
+        <div class="stat-card brick" onclick="goToFiltered('badfans')"><div class="val" id="stat-badfans">0</div><div class="lbl">Halls with non-working fans</div></div>
+        <div class="stat-card brick" onclick="goToFiltered('badacs')"><div class="val" id="stat-badacs">0</div><div class="lbl">Halls with non-working ACs</div></div>
         <div class="stat-card brick" onclick="goToFiltered('issues')"><div class="val" id="stat-issues">0</div><div class="lbl">Halls needing attention</div></div>
       </div>
 
@@ -515,40 +508,71 @@
         <fieldset style="margin-bottom:0;">
           <legend>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="18" height="7" rx="1.5"/><path d="M5 10V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M5 17v3M19 17v3"/></svg>
-            Seating arrangement
+            Benches
           </legend>
-          <div class="seg" id="seat-type-seg">
-            <button type="button" class="active" data-type="bench" onclick="setSeatType('bench')">Benches</button>
-            <button type="button" data-type="chair" onclick="setSeatType('chair')">Chairs</button>
-          </div>
-          <div style="height:12px;"></div>
           <div class="row-2">
             <div class="field">
               <label>Total rows</label>
-              <input type="number" min="0" id="f-rows" placeholder="0" oninput="recalc()">
+              <input type="number" min="0" id="f-benchRows" placeholder="0" oninput="recalc()">
             </div>
             <div class="field">
               <label>Total columns</label>
-              <input type="number" min="0" id="f-cols" placeholder="0" oninput="recalc()">
+              <input type="number" min="0" id="f-benchCols" placeholder="0" oninput="recalc()">
             </div>
           </div>
-          <div class="field" id="wrap-benchCap">
+          <div class="field" style="margin-bottom:0;">
             <label>Seating capacity of one bench</label>
             <input type="number" min="0" id="f-benchCap" placeholder="e.g. 3" oninput="recalc()">
           </div>
-          <div class="field" id="wrap-chairRow" style="display:none;">
+        </fieldset>
+        <div class="calc-readout" style="margin-top:12px; background:var(--gold-soft);">
+          <div>
+            <div class="n" id="bench-subtotal" style="color:#9c7420;">0</div>
+            <div class="t" style="color:#9c7420;">BENCH SEATS</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <fieldset style="margin-bottom:0;">
+          <legend>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 10V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4M4 10h16v8a1 1 0 0 1-1 1h-2v2M6 19v2m-2-3a1 1 0 0 1-1-1v-8"/></svg>
+            Chairs
+          </legend>
+          <div class="row-2">
+            <div class="field">
+              <label>Total rows</label>
+              <input type="number" min="0" id="f-chairRows" placeholder="0" oninput="recalc()">
+            </div>
+            <div class="field">
+              <label>Total columns</label>
+              <input type="number" min="0" id="f-chairCols" placeholder="0" oninput="recalc()">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
             <label>Number of chairs in one row</label>
             <input type="number" min="0" id="f-chairRow" placeholder="e.g. 12" oninput="recalc()">
           </div>
+        </fieldset>
+        <div class="calc-readout" style="margin-top:12px; background:var(--gold-soft);">
+          <div>
+            <div class="n" id="chair-subtotal" style="color:#9c7420;">0</div>
+            <div class="t" style="color:#9c7420;">CHAIR SEATS</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <fieldset style="margin-bottom:0;">
           <div class="field">
             <label>Correction (+ / −)</label>
-            <input type="number" id="f-correction" placeholder="0" value="0" oninput="recalc()">
-            <p class="helper">Add or subtract seats to correct for pillars, broken furniture, or field-verified counts.</p>
+            <input type="text" id="f-correction" placeholder="e.g. 0, 5, or 5-2" value="0" oninput="recalc()" inputmode="text" autocomplete="off">
+            <p class="helper">Add or subtract seats to correct for pillars, broken furniture, or field-verified counts. You can type a sum like <b>5-2</b> and it will be calculated for you.</p>
           </div>
           <div class="calc-readout">
             <div>
               <div class="n" id="calc-total">0</div>
-              <div class="t">FINAL SEATING CAPACITY</div>
+              <div class="t">FINAL SEATING CAPACITY (BENCHES + CHAIRS)</div>
             </div>
           </div>
         </fieldset>
@@ -627,8 +651,8 @@
               <span>Electrical</span>
             </label>
             <label class="chip-checkbox">
-              <input type="checkbox" id="f-repair-seats" value="Seats">
-              <span>Seats</span>
+              <input type="checkbox" id="f-repair-seats" value="Benches">
+              <span>Benches</span>
             </label>
             <label class="chip-checkbox">
               <input type="checkbox" id="f-repair-structure" value="Structure">
@@ -667,7 +691,7 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn btn-clear" onclick="clearForm()">Clear</button>
+        <button class="btn btn-clear" onclick="confirmClearForm()">Clear</button>
         <button class="btn btn-save" id="btn-save" onclick="saveRecord()">Save Hall</button>
       </div>
     </section>
@@ -767,10 +791,40 @@ function showConnectionError(){
 
 let halls = [];
 let editingId = null;
-let seatType = 'bench';
-let recordsFilter = 'all'; // 'all' | 'nowater' | 'issues'
+let recordsFilter = 'all'; // 'all' | 'nowater' | 'issues' | 'badfans' | 'badacs'
 let unsubscribeHalls = null;
 let isAuthed = false;
+let deferredInstallPrompt = null;
+
+/* ---------------- install app (Android + iPhone) ---------------- */
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+function isRunningStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+async function installApp(){
+  const hint = document.getElementById('install-hint');
+  if(isRunningStandalone()){
+    showToast('Already installed');
+    return;
+  }
+  if(deferredInstallPrompt){
+    hint.style.display = 'none';
+    deferredInstallPrompt.prompt();
+    try{ await deferredInstallPrompt.userChoice; }catch(e){}
+    deferredInstallPrompt = null;
+    return;
+  }
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  hint.textContent = isIOS
+    ? 'Tap the Share icon at the bottom of Safari, then choose "Add to Home Screen."'
+    : 'Open your browser menu (⋮) and choose "Add to Home screen" or "Install app."';
+  hint.style.display = 'block';
+}
 
 /* ---------------- auth ---------------- */
 function openLoginModal(){
@@ -779,6 +833,7 @@ function openLoginModal(){
 function closeLoginModal(){
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('login-error').textContent = '';
+  document.getElementById('install-hint').style.display = 'none';
 }
 
 function doLogin(){
@@ -898,25 +953,40 @@ function goToFiltered(filter){
 }
 
 /* ---------------- form logic ---------------- */
-function setSeatType(type){
-  seatType = type;
-  document.querySelectorAll('#seat-type-seg button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-  document.getElementById('wrap-benchCap').style.display = type === 'bench' ? 'block' : 'none';
-  document.getElementById('wrap-chairRow').style.display = type === 'chair' ? 'block' : 'none';
-  recalc();
+function safeEvalCorrection(expr){
+  if(expr === undefined || expr === null) return 0;
+  const cleaned = String(expr).trim();
+  if(cleaned === '') return 0;
+  if(!/^[0-9+\-*/(). ]+$/.test(cleaned)) return 0;
+  try{
+    const val = Function('"use strict";return (' + cleaned + ')')();
+    return (typeof val === 'number' && isFinite(val)) ? val : 0;
+  }catch(e){
+    return 0;
+  }
 }
 
 function recalc(){
-  const rows = parseFloat(document.getElementById('f-rows').value) || 0;
-  const cols = parseFloat(document.getElementById('f-cols').value) || 0;
-  const correction = parseFloat(document.getElementById('f-correction').value) || 0;
-  const perUnit = seatType === 'bench'
-    ? (parseFloat(document.getElementById('f-benchCap').value) || 0)
-    : (parseFloat(document.getElementById('f-chairRow').value) || 0);
-  const total = Math.max(0, Math.round(rows * cols * perUnit + correction));
+  const benchRows = parseFloat(document.getElementById('f-benchRows').value) || 0;
+  const benchCols = parseFloat(document.getElementById('f-benchCols').value) || 0;
+  const benchCap = parseFloat(document.getElementById('f-benchCap').value) || 0;
+  const benchSubtotal = Math.max(0, Math.round(benchRows * benchCols * benchCap));
+
+  const chairRows = parseFloat(document.getElementById('f-chairRows').value) || 0;
+  const chairCols = parseFloat(document.getElementById('f-chairCols').value) || 0;
+  const chairsPerRow = parseFloat(document.getElementById('f-chairRow').value) || 0;
+  const chairSubtotal = Math.max(0, Math.round(chairRows * chairCols * chairsPerRow));
+
+  const correction = safeEvalCorrection(document.getElementById('f-correction').value);
+
+  document.getElementById('bench-subtotal').textContent = benchSubtotal;
+  document.getElementById('chair-subtotal').textContent = chairSubtotal;
+
+  const total = Math.max(0, Math.round(benchSubtotal + chairSubtotal + correction));
   document.getElementById('calc-total').textContent = total;
-  return total;
+  return { total, benchSubtotal, chairSubtotal, correction };
 }
+
 
 function recalcFans(){
   const total = parseFloat(document.getElementById('f-fansTotal').value) || 0;
@@ -944,16 +1014,21 @@ function clearForm(){
   editingId = null;
   document.getElementById('survey-title').textContent = 'Hall Survey';
   document.getElementById('btn-save').textContent = 'Save Hall';
-  ['f-hallName','f-floor','f-rows','f-cols','f-benchCap','f-chairRow','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
+  ['f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-chairRows','f-chairCols','f-chairRow','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
     .forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-correction').value = 0;
+  document.getElementById('f-correction').value = '0';
   document.getElementById('f-lights').value = 'All Working';
   document.getElementById('f-water').checked = false;
   document.getElementById('f-signage').checked = false;
   document.getElementById('f-siteReady').checked = false;
   setRepairs([]);
-  setSeatType('bench');
   recalc(); recalcFans();
+}
+
+function confirmClearForm(){
+  if(confirm('Clear this form? Any unsaved details will be lost.')){
+    clearForm();
+  }
 }
 
 function validateForm(){
@@ -965,7 +1040,7 @@ function validateForm(){
 async function saveRecord(){
   if(!isAuthed){ openLoginModal(); return; }
   if(!validateForm()) return;
-  const capacity = recalc();
+  const calc = recalc();
   const fansNonWorking = recalcFans();
   const acTotal = parseFloat(document.getElementById('f-acTotal').value) || 0;
   const acWorking = parseFloat(document.getElementById('f-acWorking').value) || 0;
@@ -974,13 +1049,17 @@ async function saveRecord(){
     id: editingId || ('h' + Date.now()),
     hallName: document.getElementById('f-hallName').value.trim(),
     floor: document.getElementById('f-floor').value.trim(),
-    seatType: seatType,
-    rows: parseFloat(document.getElementById('f-rows').value) || 0,
-    cols: parseFloat(document.getElementById('f-cols').value) || 0,
+    benchRows: parseFloat(document.getElementById('f-benchRows').value) || 0,
+    benchCols: parseFloat(document.getElementById('f-benchCols').value) || 0,
     benchCap: parseFloat(document.getElementById('f-benchCap').value) || 0,
+    benchSubtotal: calc.benchSubtotal,
+    chairRows: parseFloat(document.getElementById('f-chairRows').value) || 0,
+    chairCols: parseFloat(document.getElementById('f-chairCols').value) || 0,
     chairRow: parseFloat(document.getElementById('f-chairRow').value) || 0,
-    correction: parseFloat(document.getElementById('f-correction').value) || 0,
-    capacity: capacity,
+    chairSubtotal: calc.chairSubtotal,
+    correctionInput: document.getElementById('f-correction').value.trim() || '0',
+    correction: calc.correction,
+    capacity: calc.total,
     fansTotal: parseFloat(document.getElementById('f-fansTotal').value) || 0,
     fansWorking: parseFloat(document.getElementById('f-fansWorking').value) || 0,
     fansNonWorking: fansNonWorking,
@@ -1013,11 +1092,31 @@ function editRecord(id){
   document.getElementById('btn-save').textContent = 'Update Hall';
   document.getElementById('f-hallName').value = h.hallName;
   document.getElementById('f-floor').value = h.floor;
-  document.getElementById('f-rows').value = h.rows;
-  document.getElementById('f-cols').value = h.cols;
-  document.getElementById('f-benchCap').value = h.benchCap;
-  document.getElementById('f-chairRow').value = h.chairRow;
-  document.getElementById('f-correction').value = h.correction;
+
+  // Support both the current dual bench+chair model and older single-type records
+  const isLegacy = h.benchRows === undefined;
+  let benchRows = 0, benchCols = 0, benchCap = 0, chairRows = 0, chairCols = 0, chairRow = 0, correctionInput;
+  if(isLegacy){
+    if(h.seatType === 'bench'){
+      benchRows = h.rows || 0; benchCols = h.cols || 0; benchCap = h.benchCap || 0;
+    } else if(h.seatType === 'chair'){
+      chairRows = h.rows || 0; chairCols = h.cols || 0; chairRow = h.chairRow || 0;
+    }
+    correctionInput = String(h.correction || 0);
+  } else {
+    benchRows = h.benchRows || 0; benchCols = h.benchCols || 0; benchCap = h.benchCap || 0;
+    chairRows = h.chairRows || 0; chairCols = h.chairCols || 0; chairRow = h.chairRow || 0;
+    correctionInput = h.correctionInput !== undefined ? h.correctionInput : String(h.correction || 0);
+  }
+
+  document.getElementById('f-benchRows').value = benchRows;
+  document.getElementById('f-benchCols').value = benchCols;
+  document.getElementById('f-benchCap').value = benchCap;
+  document.getElementById('f-chairRows').value = chairRows;
+  document.getElementById('f-chairCols').value = chairCols;
+  document.getElementById('f-chairRow').value = chairRow;
+  document.getElementById('f-correction').value = correctionInput;
+
   document.getElementById('f-fansTotal').value = h.fansTotal;
   document.getElementById('f-fansWorking').value = h.fansWorking;
   document.getElementById('f-lights').value = h.lights;
@@ -1028,7 +1127,6 @@ function editRecord(id){
   document.getElementById('f-siteReady').checked = !!h.siteReady;
   setRepairs(h.repairs);
   document.getElementById('f-remarks').value = h.remarks || '';
-  setSeatType(h.seatType);
   recalc(); recalcFans();
   goTo('survey');
 }
@@ -1052,6 +1150,8 @@ function renderDashboard(){
   document.getElementById('stat-halls').textContent = halls.length;
   document.getElementById('stat-capacity').textContent = halls.reduce((s,h) => s + h.capacity, 0);
   document.getElementById('stat-water').textContent = halls.filter(h => !h.water).length;
+  document.getElementById('stat-badfans').textContent = halls.filter(h => h.fansNonWorking > 0).length;
+  document.getElementById('stat-badacs').textContent = halls.filter(h => h.acNonWorking > 0).length;
 
   const issues = halls.filter(isHallFlagged);
   document.getElementById('stat-issues').textContent = issues.length;
@@ -1089,6 +1189,8 @@ function renderRecords(){
     all: null,
     water: 'Showing halls with water facility',
     nowater: 'Showing halls without water facility',
+    badfans: 'Showing halls with non-working fans',
+    badacs: 'Showing halls with non-working ACs',
     issues: 'Showing halls needing attention'
   };
   if(filterLabels[recordsFilter]){
@@ -1103,6 +1205,8 @@ function renderRecords(){
   let base = halls;
   if(recordsFilter === 'water') base = halls.filter(h => h.water);
   if(recordsFilter === 'nowater') base = halls.filter(h => !h.water);
+  if(recordsFilter === 'badfans') base = halls.filter(h => h.fansNonWorking > 0);
+  if(recordsFilter === 'badacs') base = halls.filter(h => h.acNonWorking > 0);
   if(recordsFilter === 'issues') base = halls.filter(isHallFlagged);
 
   const filtered = base.filter(h => (h.hallName + ' ' + h.floor).toLowerCase().includes(q));
@@ -1123,7 +1227,14 @@ function renderRecords(){
         <h3>${escapeHtml(h.hallName)}</h3>
         <span class="floor-chip">${escapeHtml(h.floor || '—')}</span>
       </div>
-      <div class="record-cap">Seating capacity: <b>${h.capacity}</b> · ${h.seatType === 'bench' ? 'Benches' : 'Chairs'}</div>
+      <div class="record-cap">Seating capacity: <b>${h.capacity}</b>${(() => {
+        const bs = h.benchSubtotal !== undefined ? h.benchSubtotal : (h.seatType === 'bench' ? h.capacity : 0);
+        const cs = h.chairSubtotal !== undefined ? h.chairSubtotal : (h.seatType === 'chair' ? h.capacity : 0);
+        const parts = [];
+        if(bs > 0) parts.push(bs + ' bench');
+        if(cs > 0) parts.push(cs + ' chair');
+        return parts.length ? ' (' + parts.join(' + ') + ')' : '';
+      })()}</div>
       <div class="chip-row">
         <span class="chip ${h.fansNonWorking > 0 ? 'warn' : 'ok'}">${h.fansWorking}/${h.fansTotal} fans</span>
         <span class="chip ${h.acNonWorking > 0 ? 'warn' : 'ok'}">${h.acWorking}/${h.acTotal} ACs</span>
@@ -1163,11 +1274,14 @@ function exportExcel(){
   const rows = halls.map(h => ({
     'Hall Name': h.hallName,
     'Floor': h.floor,
-    'Seating Type': h.seatType === 'bench' ? 'Benches' : 'Chairs',
-    'Rows': h.rows,
-    'Columns': h.cols,
-    'Capacity per Bench': h.seatType === 'bench' ? h.benchCap : '',
-    'Chairs per Row': h.seatType === 'chair' ? h.chairRow : '',
+    'Bench Rows': h.benchRows || '',
+    'Bench Columns': h.benchCols || '',
+    'Capacity per Bench': h.benchCap || '',
+    'Bench Seats': h.benchSubtotal || 0,
+    'Chair Rows': h.chairRows || '',
+    'Chair Columns': h.chairCols || '',
+    'Chairs per Row': h.chairRow || '',
+    'Chair Seats': h.chairSubtotal || 0,
     'Total Seating Capacity': h.capacity,
     'Total Fans': h.fansTotal,
     'Working Fans': h.fansWorking,
@@ -1217,10 +1331,13 @@ function exportPDF(){
     styles: { fontSize: 7.5, cellPadding: 2 },
     headStyles: { fillColor: [12,74,55], textColor: 255 },
     alternateRowStyles: { fillColor: [244,241,232] },
-    head: [[ 'Hall', 'Floor', 'Type', 'Rows', 'Cols', 'Capacity',
+    head: [[ 'Hall', 'Floor', 'Benches (R×C×Cap)', 'Chairs (R×C×PerRow)', 'Capacity',
               'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Water', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
     body: halls.map(h => [
-      h.hallName, h.floor, h.seatType === 'bench' ? 'Bench' : 'Chair', h.rows, h.cols, h.capacity,
+      h.hallName, h.floor,
+      (h.benchRows || h.benchCols || h.benchCap) ? `${h.benchRows||0}×${h.benchCols||0}×${h.benchCap||0}` : '—',
+      (h.chairRows || h.chairCols || h.chairRow) ? `${h.chairRows||0}×${h.chairCols||0}×${h.chairRow||0}` : '—',
+      h.capacity,
       `${h.fansWorking}/${h.fansTotal}`, h.fansNonWorking, h.lights,
       `${h.acWorking}/${h.acTotal}`, h.acNonWorking, h.water ? 'Yes' : 'No',
       h.signage ? 'Yes' : 'No', h.siteReady ? 'Yes' : 'No',
@@ -1233,7 +1350,8 @@ function exportPDF(){
 }
 
 /* ---------------- init ---------------- */
-setSeatType('bench');
+recalc();
+recalcFans();
 startHallsListener();
 </script>
 </body>
