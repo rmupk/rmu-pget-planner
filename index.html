@@ -394,6 +394,19 @@
     font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center;
     justify-content:center; gap:7px; font-family:'Manrope',sans-serif;
   }
+  .btn-secondary{
+    width:100%; margin-top:10px; padding:12px; border-radius:var(--radius-sm);
+    border:1.5px solid var(--emerald); background:var(--emerald-soft); color:#1f6b4f;
+    font-weight:700; font-size:13.5px; cursor:pointer; font-family:'Manrope',sans-serif;
+  }
+  .brand-footer{
+    font-size:10.5px; color:var(--ink-soft); margin-top:18px; margin-bottom:0; text-align:center; line-height:1.5;
+  }
+  .app-footer{
+    text-align:center; font-size:10.5px; color:var(--ink-soft);
+    padding:7px 12px calc(7px + env(safe-area-inset-bottom));
+    background:var(--paper); border-top:1px solid var(--line); flex-shrink:0;
+  }
   .install-hint{
     font-size:12px; color:#1f6b4f; background:var(--emerald-soft); border-radius:10px;
     padding:9px 12px; margin-top:10px; display:none; text-align:left; font-weight:600; line-height:1.5;
@@ -420,7 +433,7 @@
       <span class="fallback">RMU</span>
     </div>
     <h1>Venue Management System</h1>
-    <p class="sub">Sign in to manage the PGET hall survey</p>
+    <p class="sub">Sign in to manage Venues</p>
     <div class="field">
       <label>Email</label>
       <input type="text" id="login-email" placeholder="you@rmur.edu.pk" autocomplete="username">
@@ -432,11 +445,13 @@
     </div>
     <p class="login-error" id="login-error"></p>
     <button class="cta-primary" onclick="doLogin()">Sign In</button>
+    <button class="btn-secondary" onclick="continueAsViewer()">View Venues</button>
     <button class="btn-install" onclick="installApp()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
       Install App
     </button>
     <p class="install-hint" id="install-hint"></p>
+    <p class="brand-footer">© 2026 - Dr. Syed Muhammad Ali,  RMU, Rwp.</p>
   </div>
 </div>
 
@@ -520,15 +535,20 @@
               <input type="number" min="0" id="f-benchCols" placeholder="0" oninput="recalc()">
             </div>
           </div>
-          <div class="field" style="margin-bottom:0;">
+          <div class="field">
             <label>Seating capacity of one bench</label>
             <input type="number" min="0" id="f-benchCap" placeholder="e.g. 3" oninput="recalc()">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Correction (+ / −)</label>
+            <input type="text" id="f-correction" placeholder="e.g. 0, 5, or 5-2" value="0" oninput="recalc()" inputmode="text" autocomplete="off">
+            <p class="helper">Add or subtract seats to correct for pillars, broken furniture, or field-verified counts. You can type a sum like <b>5-2</b> and it will be calculated for you.</p>
           </div>
         </fieldset>
         <div class="calc-readout" style="margin-top:12px; background:var(--gold-soft);">
           <div>
             <div class="n" id="bench-subtotal" style="color:#9c7420;">0</div>
-            <div class="t" style="color:#9c7420;">BENCH SEATS</div>
+            <div class="t" style="color:#9c7420;">TOTAL BENCHES CAPACITY</div>
           </div>
         </div>
       </div>
@@ -539,36 +559,21 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 10V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4M4 10h16v8a1 1 0 0 1-1 1h-2v2M6 19v2m-2-3a1 1 0 0 1-1-1v-8"/></svg>
             Chairs
           </legend>
-          <div class="row-2">
-            <div class="field">
-              <label>Total rows</label>
-              <input type="number" min="0" id="f-chairRows" placeholder="0" oninput="recalc()">
-            </div>
-            <div class="field">
-              <label>Total columns</label>
-              <input type="number" min="0" id="f-chairCols" placeholder="0" oninput="recalc()">
-            </div>
-          </div>
           <div class="field" style="margin-bottom:0;">
-            <label>Number of chairs in one row</label>
-            <input type="number" min="0" id="f-chairRow" placeholder="e.g. 12" oninput="recalc()">
+            <label>Total number of chairs</label>
+            <input type="number" min="0" id="f-chairCount" placeholder="e.g. 40" oninput="recalc()">
           </div>
         </fieldset>
         <div class="calc-readout" style="margin-top:12px; background:var(--gold-soft);">
           <div>
             <div class="n" id="chair-subtotal" style="color:#9c7420;">0</div>
-            <div class="t" style="color:#9c7420;">CHAIR SEATS</div>
+            <div class="t" style="color:#9c7420;">TOTAL CHAIRS</div>
           </div>
         </div>
       </div>
 
       <div class="card-block">
         <fieldset style="margin-bottom:0;">
-          <div class="field">
-            <label>Correction (+ / −)</label>
-            <input type="text" id="f-correction" placeholder="e.g. 0, 5, or 5-2" value="0" oninput="recalc()" inputmode="text" autocomplete="off">
-            <p class="helper">Add or subtract seats to correct for pillars, broken furniture, or field-verified counts. You can type a sum like <b>5-2</b> and it will be calculated for you.</p>
-          </div>
           <div class="calc-readout">
             <div>
               <div class="n" id="calc-total">0</div>
@@ -711,15 +716,25 @@
       <h2 class="section-title">Reports</h2>
       <p class="section-hint">Export every surveyed hall as a spreadsheet or a printable PDF report.</p>
 
-      <button class="report-btn excel" onclick="exportExcel()">
-        <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l6 6M15 13l-6 6"/></svg></span>
-        <span class="txt"><strong>Export to Excel</strong><span>.xlsx spreadsheet of all hall data</span></span>
-      </button>
+      <div id="reports-full">
+        <button class="report-btn excel" onclick="exportExcel()">
+          <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l6 6M15 13l-6 6"/></svg></span>
+          <span class="txt"><strong>Export to Excel</strong><span>.xlsx spreadsheet of all hall data</span></span>
+        </button>
 
-      <button class="report-btn pdf" onclick="exportPDF()">
-        <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h1M9 12h1M9 18h1"/></svg></span>
-        <span class="txt"><strong>Export to PDF</strong><span>Printable report, ready to share</span></span>
-      </button>
+        <button class="report-btn pdf" onclick="exportPDF()">
+          <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h1M9 12h1M9 18h1"/></svg></span>
+          <span class="txt"><strong>Export to PDF</strong><span>Full detailed report, ready to share</span></span>
+        </button>
+      </div>
+
+      <div id="reports-guest">
+        <button class="report-btn pdf" onclick="exportPDFPublic()">
+          <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h1M9 12h1M9 18h1"/></svg></span>
+          <span class="txt"><strong>Download PDF Summary</strong><span>Hall, floor, and seating capacity for every venue</span></span>
+        </button>
+        <p class="section-hint">Sign in for the full detailed report (fans, ACs, lighting, repairs) and Excel export.</p>
+      </div>
 
       <div class="card-block" style="margin-top:8px;">
         <fieldset style="margin-bottom:0;">
@@ -751,6 +766,8 @@
       <span>Reports</span>
     </button>
   </nav>
+
+  <footer class="app-footer">© 2026 - Dr. Syed Muhammad Ali,  RMU, Rwp.</footer>
 
   <div class="toast" id="toast"></div>
 </div>
@@ -871,16 +888,26 @@ function updateAuthUI(){
   }
 }
 
+function continueAsViewer(){
+  closeLoginModal();
+}
+
+let hasHandledInitialAuth = false;
+
 if(firebaseReady){
   auth.onAuthStateChanged(user => {
     isAuthed = !!user;
     updateAuthUI();
+    renderReportButtons();
     if(user){
       document.getElementById('login-email').value = '';
       document.getElementById('login-password').value = '';
       closeLoginModal();
-      showToast('Signed in');
+      if(hasHandledInitialAuth) showToast('Signed in');
+    } else if(!hasHandledInitialAuth){
+      openLoginModal();
     }
+    hasHandledInitialAuth = true;
   });
 } else {
   showConnectionError();
@@ -930,7 +957,7 @@ function goTo(view){
   document.getElementById('view-' + view).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   if(view === 'records') renderRecords();
-  if(view === 'reports') renderPreview();
+  if(view === 'reports'){ renderPreview(); renderReportButtons(); }
   if(view === 'dashboard') renderDashboard();
   document.querySelector('main').scrollTop = 0;
 }
@@ -970,21 +997,17 @@ function recalc(){
   const benchRows = parseFloat(document.getElementById('f-benchRows').value) || 0;
   const benchCols = parseFloat(document.getElementById('f-benchCols').value) || 0;
   const benchCap = parseFloat(document.getElementById('f-benchCap').value) || 0;
-  const benchSubtotal = Math.max(0, Math.round(benchRows * benchCols * benchCap));
-
-  const chairRows = parseFloat(document.getElementById('f-chairRows').value) || 0;
-  const chairCols = parseFloat(document.getElementById('f-chairCols').value) || 0;
-  const chairsPerRow = parseFloat(document.getElementById('f-chairRow').value) || 0;
-  const chairSubtotal = Math.max(0, Math.round(chairRows * chairCols * chairsPerRow));
-
   const correction = safeEvalCorrection(document.getElementById('f-correction').value);
+  const benchSubtotal = Math.max(0, Math.round(benchRows * benchCols * benchCap + correction));
+
+  const chairCount = Math.max(0, Math.round(parseFloat(document.getElementById('f-chairCount').value) || 0));
 
   document.getElementById('bench-subtotal').textContent = benchSubtotal;
-  document.getElementById('chair-subtotal').textContent = chairSubtotal;
+  document.getElementById('chair-subtotal').textContent = chairCount;
 
-  const total = Math.max(0, Math.round(benchSubtotal + chairSubtotal + correction));
+  const total = benchSubtotal + chairCount;
   document.getElementById('calc-total').textContent = total;
-  return { total, benchSubtotal, chairSubtotal, correction };
+  return { total, benchSubtotal, chairCount, correction };
 }
 
 
@@ -1014,7 +1037,7 @@ function clearForm(){
   editingId = null;
   document.getElementById('survey-title').textContent = 'Hall Survey';
   document.getElementById('btn-save').textContent = 'Save Hall';
-  ['f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-chairRows','f-chairCols','f-chairRow','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
+  ['f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-chairCount','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
     .forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-correction').value = '0';
   document.getElementById('f-lights').value = 'All Working';
@@ -1052,13 +1075,10 @@ async function saveRecord(){
     benchRows: parseFloat(document.getElementById('f-benchRows').value) || 0,
     benchCols: parseFloat(document.getElementById('f-benchCols').value) || 0,
     benchCap: parseFloat(document.getElementById('f-benchCap').value) || 0,
-    benchSubtotal: calc.benchSubtotal,
-    chairRows: parseFloat(document.getElementById('f-chairRows').value) || 0,
-    chairCols: parseFloat(document.getElementById('f-chairCols').value) || 0,
-    chairRow: parseFloat(document.getElementById('f-chairRow').value) || 0,
-    chairSubtotal: calc.chairSubtotal,
     correctionInput: document.getElementById('f-correction').value.trim() || '0',
     correction: calc.correction,
+    benchSubtotal: calc.benchSubtotal,
+    chairCount: calc.chairCount,
     capacity: calc.total,
     fansTotal: parseFloat(document.getElementById('f-fansTotal').value) || 0,
     fansWorking: parseFloat(document.getElementById('f-fansWorking').value) || 0,
@@ -1093,29 +1113,29 @@ function editRecord(id){
   document.getElementById('f-hallName').value = h.hallName;
   document.getElementById('f-floor').value = h.floor;
 
-  // Support both the current dual bench+chair model and older single-type records
-  const isLegacy = h.benchRows === undefined;
-  let benchRows = 0, benchCols = 0, benchCap = 0, chairRows = 0, chairCols = 0, chairRow = 0, correctionInput;
-  if(isLegacy){
+  // Support the oldest single-type records, the prior rows/cols chair model, and the current exact-count chair model
+  const isOldest = h.benchRows === undefined;
+  let benchRows = 0, benchCols = 0, benchCap = 0, chairCount = 0, correctionInput;
+  if(isOldest){
     if(h.seatType === 'bench'){
       benchRows = h.rows || 0; benchCols = h.cols || 0; benchCap = h.benchCap || 0;
     } else if(h.seatType === 'chair'){
-      chairRows = h.rows || 0; chairCols = h.cols || 0; chairRow = h.chairRow || 0;
+      chairCount = (h.rows || 0) * (h.cols || 0) * (h.chairRow || 0);
     }
     correctionInput = String(h.correction || 0);
   } else {
     benchRows = h.benchRows || 0; benchCols = h.benchCols || 0; benchCap = h.benchCap || 0;
-    chairRows = h.chairRows || 0; chairCols = h.chairCols || 0; chairRow = h.chairRow || 0;
     correctionInput = h.correctionInput !== undefined ? h.correctionInput : String(h.correction || 0);
+    if(h.chairCount !== undefined) chairCount = h.chairCount;
+    else if(h.chairSubtotal !== undefined) chairCount = h.chairSubtotal;
+    else if(h.chairRows !== undefined) chairCount = (h.chairRows || 0) * (h.chairCols || 0) * (h.chairRow || 0);
   }
 
   document.getElementById('f-benchRows').value = benchRows;
   document.getElementById('f-benchCols').value = benchCols;
   document.getElementById('f-benchCap').value = benchCap;
-  document.getElementById('f-chairRows').value = chairRows;
-  document.getElementById('f-chairCols').value = chairCols;
-  document.getElementById('f-chairRow').value = chairRow;
   document.getElementById('f-correction').value = correctionInput;
+  document.getElementById('f-chairCount').value = chairCount;
 
   document.getElementById('f-fansTotal').value = h.fansTotal;
   document.getElementById('f-fansWorking').value = h.fansWorking;
@@ -1228,11 +1248,10 @@ function renderRecords(){
         <span class="floor-chip">${escapeHtml(h.floor || '—')}</span>
       </div>
       <div class="record-cap">Seating capacity: <b>${h.capacity}</b>${(() => {
-        const bs = h.benchSubtotal !== undefined ? h.benchSubtotal : (h.seatType === 'bench' ? h.capacity : 0);
-        const cs = h.chairSubtotal !== undefined ? h.chairSubtotal : (h.seatType === 'chair' ? h.capacity : 0);
+        const t = getHallTotals(h);
         const parts = [];
-        if(bs > 0) parts.push(bs + ' bench');
-        if(cs > 0) parts.push(cs + ' chair');
+        if(t.benchCapacity > 0) parts.push(t.benchCapacity + ' bench');
+        if(t.chairCount > 0) parts.push(t.chairCount + ' chair');
         return parts.length ? ' (' + parts.join(' + ') + ')' : '';
       })()}</div>
       <div class="chip-row">
@@ -1268,35 +1287,41 @@ function escapeHtml(s){
   return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+function getHallTotals(h){
+  const benchCapacity = h.benchSubtotal !== undefined ? h.benchSubtotal : (h.seatType === 'bench' ? h.capacity : 0);
+  const chairCount = h.chairCount !== undefined ? h.chairCount
+    : h.chairSubtotal !== undefined ? h.chairSubtotal
+    : (h.seatType === 'chair' ? h.capacity : 0);
+  return { benchCapacity, chairCount };
+}
+
 /* ---------------- export: excel ---------------- */
 function exportExcel(){
+  if(!isAuthed){ openLoginModal(); return; }
   if(halls.length === 0){ showToast('No records to export yet'); return; }
-  const rows = halls.map(h => ({
-    'Hall Name': h.hallName,
-    'Floor': h.floor,
-    'Bench Rows': h.benchRows || '',
-    'Bench Columns': h.benchCols || '',
-    'Capacity per Bench': h.benchCap || '',
-    'Bench Seats': h.benchSubtotal || 0,
-    'Chair Rows': h.chairRows || '',
-    'Chair Columns': h.chairCols || '',
-    'Chairs per Row': h.chairRow || '',
-    'Chair Seats': h.chairSubtotal || 0,
-    'Total Seating Capacity': h.capacity,
-    'Total Fans': h.fansTotal,
-    'Working Fans': h.fansWorking,
-    'Non-Working Fans': h.fansNonWorking,
-    'Lights Condition': h.lights,
-    'Total ACs': h.acTotal,
-    'Working ACs': h.acWorking,
-    'Non-Working ACs': h.acNonWorking,
-    'Water Facility': h.water ? 'Yes' : 'No',
-    'Hall Signage Complete': h.signage ? 'Yes' : 'No',
-    'Site Ready': h.siteReady ? 'Yes' : 'No',
-    'Repairs Required': (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None',
-    'Remarks': h.remarks,
-    'Last Updated': new Date(h.updatedAt).toLocaleString()
-  }));
+  const rows = halls.map(h => {
+    const t = getHallTotals(h);
+    return {
+      'Hall Name': h.hallName,
+      'Floor': h.floor,
+      'Total Benches Capacity': t.benchCapacity,
+      'Total Chairs': t.chairCount,
+      'Total Seating Capacity': h.capacity,
+      'Total Fans': h.fansTotal,
+      'Working Fans': h.fansWorking,
+      'Non-Working Fans': h.fansNonWorking,
+      'Lights Condition': h.lights,
+      'Total ACs': h.acTotal,
+      'Working ACs': h.acWorking,
+      'Non-Working ACs': h.acNonWorking,
+      'Water Facility': h.water ? 'Yes' : 'No',
+      'Hall Signage Complete': h.signage ? 'Yes' : 'No',
+      'Site Ready': h.siteReady ? 'Yes' : 'No',
+      'Repairs Required': (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None',
+      'Remarks': h.remarks,
+      'Last Updated': new Date(h.updatedAt).toLocaleString()
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, k.length + 2) }));
   const wb = XLSX.utils.book_new();
@@ -1307,6 +1332,7 @@ function exportExcel(){
 
 /* ---------------- export: pdf ---------------- */
 function exportPDF(){
+  if(!isAuthed){ openLoginModal(); return; }
   if(halls.length === 0){ showToast('No records to export yet'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape' });
@@ -1331,28 +1357,94 @@ function exportPDF(){
     styles: { fontSize: 7.5, cellPadding: 2 },
     headStyles: { fillColor: [12,74,55], textColor: 255 },
     alternateRowStyles: { fillColor: [244,241,232] },
-    head: [[ 'Hall', 'Floor', 'Benches (R×C×Cap)', 'Chairs (R×C×PerRow)', 'Capacity',
+    head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity',
               'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Water', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
-    body: halls.map(h => [
-      h.hallName, h.floor,
-      (h.benchRows || h.benchCols || h.benchCap) ? `${h.benchRows||0}×${h.benchCols||0}×${h.benchCap||0}` : '—',
-      (h.chairRows || h.chairCols || h.chairRow) ? `${h.chairRows||0}×${h.chairCols||0}×${h.chairRow||0}` : '—',
-      h.capacity,
-      `${h.fansWorking}/${h.fansTotal}`, h.fansNonWorking, h.lights,
-      `${h.acWorking}/${h.acTotal}`, h.acNonWorking, h.water ? 'Yes' : 'No',
-      h.signage ? 'Yes' : 'No', h.siteReady ? 'Yes' : 'No',
-      (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None', h.remarks || ''
-    ])
+    body: halls.map(h => {
+      const t = getHallTotals(h);
+      return [
+        h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity,
+        `${h.fansWorking}/${h.fansTotal}`, h.fansNonWorking, h.lights,
+        `${h.acWorking}/${h.acTotal}`, h.acNonWorking, h.water ? 'Yes' : 'No',
+        h.signage ? 'Yes' : 'No', h.siteReady ? 'Yes' : 'No',
+        (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None', h.remarks || ''
+      ];
+    }),
+    didDrawPage: function(){
+      const ph = doc.internal.pageSize.getHeight();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(120,120,120);
+      doc.text('© 2026 - Dr. Syed Muhammad Ali,  RMU, Rwp.', 14, ph - 8);
+    }
   });
 
   doc.save('RMU_PGET_Hall_Survey_Report.pdf');
   showToast('PDF report downloaded');
 }
 
+/* ---------------- export: PDF (viewer/guest summary) ---------------- */
+function exportPDFPublic(){
+  if(halls.length === 0){ showToast('No records to export yet'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait' });
+
+  doc.setFillColor(12, 74, 55);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Rawalpindi Medical University — PGET Venue Summary', 14, 10);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Generated on ' + new Date().toLocaleString(), 14, 17);
+
+  doc.setTextColor(30,30,30);
+  doc.setFontSize(10);
+  doc.text(`Halls surveyed: ${halls.length}`, 14, 30);
+
+  const totalBench = halls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
+  const totalChairs = halls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
+  const totalCapacity = halls.reduce((s,h) => s + h.capacity, 0);
+
+  doc.autoTable({
+    startY: 36,
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [12,74,55], textColor: 255 },
+    alternateRowStyles: { fillColor: [244,241,232] },
+    head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity' ]],
+    body: halls.map(h => {
+      const t = getHallTotals(h);
+      return [ h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity ];
+    }),
+    foot: [[ 'Aggregate (All Venues)', '', totalBench, totalChairs, totalCapacity ]],
+    footStyles: { fillColor: [199,154,62], textColor: [12,74,55], fontStyle: 'bold' },
+    didDrawPage: function(){
+      const ph = doc.internal.pageSize.getHeight();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(120,120,120);
+      doc.text('© 2026 - Dr. Syed Muhammad Ali,  RMU, Rwp.', 14, ph - 8);
+    }
+  });
+
+  doc.save('RMU_PGET_Venue_Summary.pdf');
+  showToast('PDF downloaded');
+}
+
+/* ---------------- reports view: gate full exports behind sign-in ---------------- */
+function renderReportButtons(){
+  const fullBox = document.getElementById('reports-full');
+  const guestBox = document.getElementById('reports-guest');
+  if(!fullBox || !guestBox) return;
+  fullBox.style.display = isAuthed ? 'block' : 'none';
+  guestBox.style.display = isAuthed ? 'none' : 'block';
+}
+
 /* ---------------- init ---------------- */
 recalc();
 recalcFans();
 startHallsListener();
+renderReportButtons();
 </script>
 </body>
 </html>
