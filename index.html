@@ -140,6 +140,7 @@
   .stat-card .lbl{ font-size:11.5px; color:var(--ink-soft); margin-top:6px; font-weight:600; }
   .stat-card.gold .val{ color:#9c7420; }
   .stat-card.brick .val{ color:var(--brick); }
+  .val-sub{ font-size:12px; font-weight:700; color:#9c7420; margin-left:3px; }
 
   .cta-primary{
     display:flex; align-items:center; justify-content:center; gap:8px;
@@ -407,6 +408,19 @@
     padding:7px 12px calc(7px + env(safe-area-inset-bottom));
     background:var(--paper); border-top:1px solid var(--line); flex-shrink:0;
   }
+  .scroll-fabs{
+    position:absolute; right:14px; bottom:112px; z-index:40;
+    display:flex; flex-direction:column; gap:9px;
+  }
+  .fab{
+    width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,0.25);
+    background:linear-gradient(135deg, var(--deep), var(--emerald)); color:#fff;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow: 0 8px 18px -6px rgba(12,74,55,0.55);
+    opacity:0; transform:translateY(6px); pointer-events:none;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  .fab.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
   .install-hint{
     font-size:12px; color:#1f6b4f; background:var(--emerald-soft); border-radius:10px;
     padding:9px 12px; margin-top:10px; display:none; text-align:left; font-weight:600; line-height:1.5;
@@ -486,10 +500,10 @@
       <div class="stat-grid">
         <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-halls">0</div><div class="lbl">Halls surveyed</div></div>
         <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-capacity">0</div><div class="lbl">Total seating capacity</div></div>
-        <div class="stat-card gold" onclick="goToFiltered('nowater')"><div class="val" id="stat-water">0</div><div class="lbl">Halls without water facility</div></div>
-        <div class="stat-card brick" onclick="goToFiltered('badfans')"><div class="val" id="stat-badfans">0</div><div class="lbl">Halls with non-working fans</div></div>
-        <div class="stat-card brick" onclick="goToFiltered('badacs')"><div class="val" id="stat-badacs">0</div><div class="lbl">Halls with non-working ACs</div></div>
+        <div class="stat-card brick" onclick="goToFiltered('badfans')"><div class="val" id="stat-badfans">0</div><div class="lbl">Halls with Fans Needing Attention</div></div>
+        <div class="stat-card brick" onclick="goToFiltered('badacs')"><div class="val" id="stat-badacs">0</div><div class="lbl">Halls with ACs Needing Attention</div></div>
         <div class="stat-card brick" onclick="goToFiltered('issues')"><div class="val" id="stat-issues">0</div><div class="lbl">Halls needing attention</div></div>
+        <div class="stat-card gold" onclick="goToFiltered('ready')"><div class="val" id="stat-ready">0</div><div class="lbl">Ready Sites</div></div>
       </div>
 
       <button class="cta-primary" onclick="goSurvey()">
@@ -769,6 +783,15 @@
 
   <footer class="app-footer">© 2026 - Dr. Syed Muhammad Ali,  RMU, Rwp.</footer>
 
+  <div class="scroll-fabs" id="scroll-fabs">
+    <button class="fab" id="fab-up" onclick="scrollMain('top')" title="Scroll to top">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
+    <button class="fab" id="fab-down" onclick="scrollMain('bottom')" title="Scroll to bottom">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    </button>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -808,7 +831,7 @@ function showConnectionError(){
 
 let halls = [];
 let editingId = null;
-let recordsFilter = 'all'; // 'all' | 'nowater' | 'issues' | 'badfans' | 'badacs'
+let recordsFilter = 'all'; // 'all' | 'issues' | 'badfans' | 'badacs' | 'ready'
 let unsubscribeHalls = null;
 let isAuthed = false;
 let deferredInstallPrompt = null;
@@ -960,6 +983,24 @@ function goTo(view){
   if(view === 'reports'){ renderPreview(); renderReportButtons(); }
   if(view === 'dashboard') renderDashboard();
   document.querySelector('main').scrollTop = 0;
+  setTimeout(updateScrollFabs, 50);
+}
+
+function scrollMain(where){
+  const main = document.querySelector('main');
+  main.scrollTo({ top: where === 'top' ? 0 : main.scrollHeight, behavior: 'smooth' });
+}
+
+function updateScrollFabs(){
+  const main = document.querySelector('main');
+  const upBtn = document.getElementById('fab-up');
+  const downBtn = document.getElementById('fab-down');
+  if(!main || !upBtn || !downBtn) return;
+  const scrollable = main.scrollHeight > main.clientHeight + 40;
+  const atTop = main.scrollTop < 40;
+  const atBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 40;
+  upBtn.classList.toggle('show', scrollable && !atTop);
+  downBtn.classList.toggle('show', scrollable && !atBottom);
 }
 
 function showToast(msg){
@@ -971,7 +1012,7 @@ function showToast(msg){
 
 function isHallFlagged(h){
   return h.fansNonWorking > 0 || h.acNonWorking > 0 || h.lights !== 'All Working'
-    || !h.signage || !h.siteReady || (h.repairs && h.repairs.length > 0);
+    || !h.signage || (h.repairs && h.repairs.length > 0);
 }
 
 function goToFiltered(filter){
@@ -1169,12 +1210,18 @@ function renderAll(){
 function renderDashboard(){
   document.getElementById('stat-halls').textContent = halls.length;
   document.getElementById('stat-capacity').textContent = halls.reduce((s,h) => s + h.capacity, 0);
-  document.getElementById('stat-water').textContent = halls.filter(h => !h.water).length;
-  document.getElementById('stat-badfans').textContent = halls.filter(h => h.fansNonWorking > 0).length;
-  document.getElementById('stat-badacs').textContent = halls.filter(h => h.acNonWorking > 0).length;
+  const badFansHalls = halls.filter(h => h.fansNonWorking > 0);
+  const badAcsHalls = halls.filter(h => h.acNonWorking > 0);
+  const totalBadFans = badFansHalls.reduce((s,h) => s + h.fansNonWorking, 0);
+  const totalBadAcs = badAcsHalls.reduce((s,h) => s + h.acNonWorking, 0);
+  document.getElementById('stat-badfans').innerHTML = badFansHalls.length
+    + (totalBadFans > 0 ? ` <span class="val-sub">(${totalBadFans})</span>` : '');
+  document.getElementById('stat-badacs').innerHTML = badAcsHalls.length
+    + (totalBadAcs > 0 ? ` <span class="val-sub">(${totalBadAcs})</span>` : '');
 
   const issues = halls.filter(isHallFlagged);
   document.getElementById('stat-issues').textContent = issues.length;
+  document.getElementById('stat-ready').textContent = halls.filter(h => h.siteReady).length;
 
   const list = document.getElementById('attention-list');
   if(halls.length === 0){
@@ -1191,7 +1238,6 @@ function renderDashboard(){
     if(h.acNonWorking > 0) bits.push(h.acNonWorking + ' AC(s) not working');
     if(h.lights !== 'All Working') bits.push(h.lights.toLowerCase());
     if(!h.signage) bits.push('signage pending');
-    if(!h.siteReady) bits.push('site not ready');
     if(h.repairs && h.repairs.length) bits.push('repairs needed: ' + h.repairs.join(', '));
     return `<div class="alert-item">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 9v4M12 17h.01M10.3 3.9 2.6 18a1.5 1.5 0 0 0 1.3 2.2h16.2a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z"/></svg>
@@ -1207,11 +1253,10 @@ function renderRecords(){
 
   const filterLabels = {
     all: null,
-    water: 'Showing halls with water facility',
-    nowater: 'Showing halls without water facility',
     badfans: 'Showing halls with non-working fans',
     badacs: 'Showing halls with non-working ACs',
-    issues: 'Showing halls needing attention'
+    issues: 'Showing halls needing attention',
+    ready: 'Showing sites marked ready'
   };
   if(filterLabels[recordsFilter]){
     banner.innerHTML = `<div class="filter-chip-banner">
@@ -1223,11 +1268,10 @@ function renderRecords(){
   }
 
   let base = halls;
-  if(recordsFilter === 'water') base = halls.filter(h => h.water);
-  if(recordsFilter === 'nowater') base = halls.filter(h => !h.water);
   if(recordsFilter === 'badfans') base = halls.filter(h => h.fansNonWorking > 0);
   if(recordsFilter === 'badacs') base = halls.filter(h => h.acNonWorking > 0);
   if(recordsFilter === 'issues') base = halls.filter(isHallFlagged);
+  if(recordsFilter === 'ready') base = halls.filter(h => h.siteReady);
 
   const filtered = base.filter(h => (h.hallName + ' ' + h.floor).toLowerCase().includes(q));
 
@@ -1314,7 +1358,6 @@ function exportExcel(){
       'Total ACs': h.acTotal,
       'Working ACs': h.acWorking,
       'Non-Working ACs': h.acNonWorking,
-      'Water Facility': h.water ? 'Yes' : 'No',
       'Hall Signage Complete': h.signage ? 'Yes' : 'No',
       'Site Ready': h.siteReady ? 'Yes' : 'No',
       'Repairs Required': (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None',
@@ -1358,13 +1401,13 @@ function exportPDF(){
     headStyles: { fillColor: [12,74,55], textColor: 255 },
     alternateRowStyles: { fillColor: [244,241,232] },
     head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity',
-              'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Water', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
+              'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
     body: halls.map(h => {
       const t = getHallTotals(h);
       return [
         h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity,
         `${h.fansWorking}/${h.fansTotal}`, h.fansNonWorking, h.lights,
-        `${h.acWorking}/${h.acTotal}`, h.acNonWorking, h.water ? 'Yes' : 'No',
+        `${h.acWorking}/${h.acTotal}`, h.acNonWorking,
         h.signage ? 'Yes' : 'No', h.siteReady ? 'Yes' : 'No',
         (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None', h.remarks || ''
       ];
@@ -1445,6 +1488,8 @@ recalc();
 recalcFans();
 startHallsListener();
 renderReportButtons();
+document.querySelector('main').addEventListener('scroll', updateScrollFabs);
+setTimeout(updateScrollFabs, 200);
 </script>
 </body>
 </html>
