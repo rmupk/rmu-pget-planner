@@ -62,7 +62,7 @@
   #app{
     width:100%;
     max-width:480px;
-    min-height:100vh;
+    height:100vh;
     background:var(--paper);
     position:relative;
     display:flex;
@@ -332,13 +332,13 @@
 
   @media (min-width:481px){
     body{ padding:24px 0; }
-    #app{ min-height:calc(100vh - 48px); border-radius:32px; }
+    #app{ height:calc(100vh - 48px); border-radius:32px; }
   }
 
   @media (min-width:900px){
     body{ padding:0; align-items:flex-start; }
     #app{
-      max-width:1080px; width:100%; min-height:100vh; border-radius:0;
+      max-width:1080px; width:100%; height:100vh; border-radius:0;
       box-shadow:none;
     }
     header.appbar{ padding:22px 40px 26px; }
@@ -360,7 +360,7 @@
   }
 
   @media (min-width:1120px){
-    #app{ box-shadow: 0 0 60px rgba(0,0,0,0.35); margin:24px auto; min-height:calc(100vh - 48px); }
+    #app{ box-shadow: 0 0 60px rgba(0,0,0,0.35); margin:24px auto; height:calc(100vh - 48px); }
     body{ padding:24px 0; align-items:flex-start; justify-content:center; }
   }
 
@@ -499,7 +499,7 @@
     <section class="view active" id="view-dashboard">
       <h2 class="section-title">Overview</h2>
       <div class="stat-grid">
-        <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-halls">0</div><div class="lbl">Halls surveyed</div></div>
+        <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-halls">0</div><div class="lbl">Total Halls</div></div>
         <div class="stat-card" onclick="goToFiltered('all')"><div class="val" id="stat-capacity">0</div><div class="lbl">Total seating capacity</div></div>
         <div class="stat-card brick" onclick="goToFiltered('badfans')"><div class="val" id="stat-badfans">0</div><div class="lbl">Halls with Fans Needing Attention</div></div>
         <div class="stat-card brick" onclick="goToFiltered('badacs')"><div class="val" id="stat-badacs">0</div><div class="lbl">Halls with ACs Needing Attention</div></div>
@@ -509,7 +509,7 @@
 
       <button class="cta-primary" onclick="goSurvey()">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        Survey a New Hall
+        Add New Hall
       </button>
 
       <div class="alert-list" id="attention-list"></div>
@@ -1237,7 +1237,7 @@ function renderDashboard(){
 
   const list = document.getElementById('attention-list');
   if(halls.length === 0){
-    list.innerHTML = '<div class="empty-note">No halls surveyed yet. Tap "Survey a New Hall" to begin.</div>';
+    list.innerHTML = '<div class="empty-note">No halls surveyed yet. Tap "Add New Hall" to begin.</div>';
     return;
   }
   if(issues.length === 0){
