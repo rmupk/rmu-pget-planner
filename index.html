@@ -152,6 +152,25 @@
   }
   .cta-primary:active{ transform: translateY(1px); }
 
+  .maint-alert-tile{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    gap:8px; padding:18px 16px; border-radius:var(--radius-lg); margin-bottom:16px;
+    cursor:pointer; box-shadow: var(--shadow); border:1.5px solid var(--line);
+    background:var(--emerald-soft); transition: transform .12s ease;
+  }
+  .maint-alert-tile:active{ transform: scale(0.985); }
+  .maint-alert-tile.pending{ background:var(--brick-soft); border-color:var(--brick); }
+  .maint-alert-icon{
+    width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:var(--emerald); color:#fff;
+  }
+  .maint-alert-tile.pending .maint-alert-icon{ background:var(--brick); }
+  .maint-alert-headline{
+    font-family:'Fraunces', serif; font-weight:600; font-size:16.5px; color:#1f6b4f;
+  }
+  .maint-alert-tile.pending .maint-alert-headline{ color:#8a3524; }
+  .maint-alert-sub{ font-size:12px; color:var(--ink-soft); font-weight:600; }
+
   .alert-list{ margin-top:18px; }
   .alert-item{
     display:flex; gap:10px; align-items:flex-start;
@@ -244,6 +263,16 @@
   }
   .calc-readout .n{ font-family:'Fraunces', serif; font-size:24px; font-weight:700; color:var(--deep); }
   .calc-readout .t{ font-size:11.5px; color:#2c5c49; font-weight:700; }
+
+  .maint-block{
+    background: linear-gradient(155deg, var(--gold-soft) 0%, #FBF3E1 100%);
+    border:2px solid var(--gold); border-radius:var(--radius-lg);
+    padding:16px; margin-bottom:16px; box-shadow: var(--shadow);
+  }
+  .maint-block-head{
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    color:#9c7420; font-family:'Fraunces', serif; font-weight:600; font-size:15.5px;
+  }
 
   .form-actions{ display:flex; gap:10px; margin-top:4px; }
   .btn{
@@ -507,7 +536,17 @@
         <div class="stat-card gold" onclick="goToFiltered('ready')"><div class="val" id="stat-ready">0</div><div class="lbl">Ready Sites</div></div>
       </div>
 
-      <button class="cta-primary" onclick="goSurvey()">
+      <div class="maint-alert-tile" id="maint-alert-tile" onclick="goToFiltered('pendingmaint')">
+        <div class="maint-alert-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.7 6.3-8.4 8.4a2 2 0 0 0-.5.9L5 19l3.4-.8a2 2 0 0 0 .9-.5l8.4-8.4a2 2 0 0 0 0-2.8l-.2-.2a2 2 0 0 0-2.8 0Z"/></svg>
+        </div>
+        <div class="maint-alert-text">
+          <div class="maint-alert-headline" id="maint-alert-headline">No Pending Maintenance</div>
+          <div class="maint-alert-sub" id="maint-alert-sub"></div>
+        </div>
+      </div>
+
+      <button class="cta-primary" id="dashboard-add-hall-btn" onclick="goSurvey()">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         Add New Hall
       </button>
@@ -710,8 +749,25 @@
         </div>
       </div>
 
+      <div class="maint-block" id="maint-block">
+        <div class="maint-block-head">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.7 6.3-8.4 8.4a2 2 0 0 0-.5.9L5 19l3.4-.8a2 2 0 0 0 .9-.5l8.4-8.4a2 2 0 0 0 0-2.8l-.2-.2a2 2 0 0 0-2.8 0Z"/></svg>
+          <span>Maintenance</span>
+        </div>
+        <div class="toggle-row" style="background:transparent; border:none; padding:4px 0 0;">
+          <span style="font-size:15px;">Maintenance Completed</span>
+          <label class="switch">
+            <input type="checkbox" id="f-maintCompleted">
+            <span class="track"></span>
+          </label>
+        </div>
+        <p class="helper" id="maint-lock-note" style="display:none; margin-top:10px;">
+          As Maintenance staff, you can only update this toggle. All other fields on this hall are locked.
+        </p>
+      </div>
+
       <div class="form-actions">
-        <button class="btn btn-clear" onclick="confirmClearForm()">Clear</button>
+        <button class="btn btn-clear" id="btn-clear" onclick="confirmClearForm()">Clear</button>
         <button class="btn btn-save" id="btn-save" onclick="saveRecord()">Save Hall</button>
       </div>
     </section>
@@ -749,6 +805,10 @@
           <span class="txt"><strong>Download PDF Summary</strong><span>Hall, floor, and seating capacity for every venue</span></span>
         </button>
         <p class="section-hint">Sign in for the full detailed report (fans, ACs, lighting, repairs) and Excel export.</p>
+      </div>
+
+      <div id="reports-restricted" style="display:none;">
+        <div class="empty-note">Reports aren't available for the Maintenance role.</div>
       </div>
 
       <div class="card-block" style="margin-top:8px;">
@@ -920,19 +980,54 @@ function continueAsViewer(){
 }
 
 let hasHandledInitialAuth = false;
+let userRole = 'none'; // 'admin' | 'user' | 'maintenance' | 'none'
+
+async function fetchUserRole(user){
+  if(!user || !firebaseReady){ userRole = 'none'; applyRoleUI(); return; }
+  try{
+    const emailKey = (user.email || '').trim().toLowerCase();
+    const doc = await db.collection('roles').doc(emailKey).get();
+    userRole = (doc.exists && doc.data().role) ? doc.data().role : 'none';
+  }catch(e){
+    userRole = 'none';
+  }
+  applyRoleUI();
+}
+
+function applyRoleUI(){
+  const isMaintenance = userRole === 'maintenance';
+
+  // Bottom nav: Maintenance only gets Dashboard + Records
+  const surveyTab = document.querySelector('.nav-btn[data-view="survey"]');
+  const reportsTab = document.querySelector('.nav-btn[data-view="reports"]');
+  if(surveyTab) surveyTab.style.display = (isAuthed && isMaintenance) ? 'none' : '';
+  if(reportsTab) reportsTab.style.display = (isAuthed && isMaintenance) ? 'none' : '';
+
+  const surveyCta = document.getElementById('dashboard-add-hall-btn');
+  if(surveyCta) surveyCta.style.display = (isAuthed && isMaintenance) ? 'none' : '';
+
+  renderReportButtons();
+  renderDashboard();
+  renderRecords();
+}
 
 if(firebaseReady){
   auth.onAuthStateChanged(user => {
     isAuthed = !!user;
     updateAuthUI();
-    renderReportButtons();
     if(user){
       document.getElementById('login-email').value = '';
       document.getElementById('login-password').value = '';
       closeLoginModal();
       if(hasHandledInitialAuth) showToast('Signed in');
+      fetchUserRole(user);
     } else if(!hasHandledInitialAuth){
       openLoginModal();
+      userRole = 'none';
+      applyRoleUI();
+    } else {
+      userRole = 'none';
+      applyRoleUI();
     }
     hasHandledInitialAuth = true;
   });
@@ -975,6 +1070,10 @@ async function deleteHallDoc(id){
 /* ---------------- navigation ---------------- */
 function goSurvey(){
   if(!isAuthed){ openLoginModal(); return; }
+  if(userRole !== 'admin' && userRole !== 'user'){
+    showToast('Only Admins and Users can add a new hall');
+    return;
+  }
   clearForm();
   goTo('survey');
 }
@@ -1097,11 +1196,18 @@ function clearForm(){
   document.getElementById('f-water').checked = false;
   document.getElementById('f-signage').checked = false;
   document.getElementById('f-siteReady').checked = false;
+  document.getElementById('f-maintCompleted').checked = false;
   setRepairs([]);
+  setFieldsLocked(false);
+  document.getElementById('f-maintCompleted').disabled = false;
   recalc(); recalcFans();
 }
 
 function confirmClearForm(){
+  if(userRole !== 'admin'){
+    showToast('Only Admins can clear the form');
+    return;
+  }
   if(confirm('Clear this form? Any unsaved details will be lost.')){
     clearForm();
   }
@@ -1115,6 +1221,11 @@ function validateForm(){
 
 async function saveRecord(){
   if(!isAuthed){ openLoginModal(); return; }
+  if(userRole === 'none'){ showToast('Your account has no assigned role — contact an Admin'); return; }
+  if(!editingId && userRole !== 'admin' && userRole !== 'user'){
+    showToast('Only Admins and Users can add a new hall');
+    return;
+  }
   if(!validateForm()) return;
   const calc = recalc();
   const fansNonWorking = recalcFans();
@@ -1143,6 +1254,7 @@ async function saveRecord(){
     water: document.getElementById('f-water').checked,
     signage: document.getElementById('f-signage').checked,
     siteReady: document.getElementById('f-siteReady').checked,
+    maintenanceCompleted: document.getElementById('f-maintCompleted').checked,
     repairs: getRepairs(),
     remarks: document.getElementById('f-remarks').value.trim(),
     updatedAt: new Date().toISOString()
@@ -1198,15 +1310,45 @@ function editRecord(id){
   document.getElementById('f-water').checked = h.water;
   document.getElementById('f-signage').checked = !!h.signage;
   document.getElementById('f-siteReady').checked = !!h.siteReady;
+  document.getElementById('f-maintCompleted').checked = !!h.maintenanceCompleted;
   setRepairs(h.repairs);
   document.getElementById('f-remarks').value = h.remarks || '';
   recalc(); recalcFans();
+
+  const isMaintenance = userRole === 'maintenance';
+  document.getElementById('survey-title').textContent = isMaintenance ? 'Maintenance Update' : 'Edit Hall';
+  document.getElementById('btn-save').textContent = isMaintenance ? 'Save Maintenance Status' : 'Update Hall';
+  setFieldsLocked(isMaintenance);
+  document.getElementById('f-maintCompleted').disabled = (userRole === 'user');
+
   goTo('survey');
+}
+
+const LOCKABLE_FIELD_IDS = [
+  'f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-correction',
+  'f-chairCount','f-fansTotal','f-fansWorking','f-lights','f-acTotal','f-acWorking',
+  'f-water','f-signage','f-siteReady','f-remarks',
+  'f-repair-electrical','f-repair-seats','f-repair-structure'
+];
+
+function setFieldsLocked(locked){
+  LOCKABLE_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.disabled = locked;
+  });
+  const note = document.getElementById('maint-lock-note');
+  if(note) note.style.display = locked ? 'block' : 'none';
+  const clearBtn = document.getElementById('btn-clear');
+  if(clearBtn) clearBtn.style.display = (locked || userRole !== 'admin') ? 'none' : '';
 }
 
 async function deleteRecord(id, evt){
   if(evt) evt.stopPropagation();
   if(!isAuthed){ openLoginModal(); return; }
+  if(userRole !== 'admin'){
+    showToast('Only Admins can delete a hall');
+    return;
+  }
   if(!confirm('Delete this hall record? This cannot be undone.')) return;
   await deleteHallDoc(id);
   showToast('Hall deleted');
@@ -1234,6 +1376,23 @@ function renderDashboard(){
   const issues = halls.filter(isHallFlagged);
   document.getElementById('stat-issues').textContent = issues.length;
   document.getElementById('stat-ready').textContent = halls.filter(h => h.siteReady).length;
+
+  const pendingMaint = halls.filter(h => h.repairs && h.repairs.length > 0);
+  const awaitingVerification = pendingMaint.filter(h => h.maintenanceCompleted).length;
+  const maintTile = document.getElementById('maint-alert-tile');
+  const maintHeadline = document.getElementById('maint-alert-headline');
+  const maintSub = document.getElementById('maint-alert-sub');
+  if(pendingMaint.length === 0){
+    maintTile.classList.remove('pending');
+    maintHeadline.textContent = 'No Pending Maintenance';
+    maintSub.textContent = '';
+  } else {
+    maintTile.classList.add('pending');
+    maintHeadline.textContent = pendingMaint.length + (pendingMaint.length === 1 ? ' Hall Pending Maintenance' : ' Halls Pending Maintenance');
+    maintSub.textContent = awaitingVerification > 0
+      ? `${awaitingVerification} marked complete — awaiting verification`
+      : 'Tap to view affected halls';
+  }
 
   const list = document.getElementById('attention-list');
   if(halls.length === 0){
@@ -1268,7 +1427,8 @@ function renderRecords(){
     badfans: 'Showing halls with non-working fans',
     badacs: 'Showing halls with non-working ACs',
     issues: 'Showing halls needing attention',
-    ready: 'Showing sites marked ready'
+    ready: 'Showing sites marked ready',
+    pendingmaint: 'Showing halls with repairs required'
   };
   if(filterLabels[recordsFilter]){
     banner.innerHTML = `<div class="filter-chip-banner">
@@ -1284,6 +1444,7 @@ function renderRecords(){
   if(recordsFilter === 'badacs') base = halls.filter(h => h.acNonWorking > 0);
   if(recordsFilter === 'issues') base = halls.filter(isHallFlagged);
   if(recordsFilter === 'ready') base = halls.filter(h => h.siteReady);
+  if(recordsFilter === 'pendingmaint') base = halls.filter(h => h.repairs && h.repairs.length > 0);
 
   const filtered = base.filter(h => (h.hallName + ' ' + h.floor).toLowerCase().includes(q));
 
@@ -1318,9 +1479,10 @@ function renderRecords(){
         <span class="chip ${h.signage ? 'ok' : 'warn'}">${h.signage ? 'Signage complete' : 'Signage pending'}</span>
         <span class="chip ${h.siteReady ? 'ok' : 'warn'}">${h.siteReady ? 'Site ready' : 'Site not ready'}</span>
         <span class="chip ${(h.repairs && h.repairs.length) ? 'warn' : 'ok'}">${(h.repairs && h.repairs.length) ? 'Repairs: ' + h.repairs.join(', ') : 'No repairs needed'}</span>
+        ${(h.repairs && h.repairs.length) ? `<span class="chip ${h.maintenanceCompleted ? 'ok' : 'warn'}">${h.maintenanceCompleted ? 'Maintenance completed' : 'Maintenance pending'}</span>` : ''}
       </div>
       <div style="text-align:right; margin-top:10px;">
-        <button onclick="deleteRecord('${h.id}', event)" style="background:none;border:none;color:#A6432F;font-size:12px;font-weight:700;cursor:pointer;">Delete</button>
+        ${userRole === 'admin' ? `<button onclick="deleteRecord('${h.id}', event)" style="background:none;border:none;color:#A6432F;font-size:12px;font-weight:700;cursor:pointer;">Delete</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -1354,6 +1516,7 @@ function getHallTotals(h){
 /* ---------------- export: excel ---------------- */
 function exportExcel(){
   if(!isAuthed){ openLoginModal(); return; }
+  if(userRole !== 'admin'){ showToast('Only Admins can export Excel'); return; }
   if(halls.length === 0){ showToast('No records to export yet'); return; }
   const rows = halls.map(h => {
     const t = getHallTotals(h);
@@ -1401,6 +1564,7 @@ function exportExcel(){
 /* ---------------- export: pdf ---------------- */
 function exportPDF(){
   if(!isAuthed){ openLoginModal(); return; }
+  if(userRole !== 'admin'){ showToast('Only Admins can export the full PDF report'); return; }
   if(halls.length === 0){ showToast('No records to export yet'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape' });
@@ -1507,9 +1671,13 @@ function exportPDFPublic(){
 function renderReportButtons(){
   const fullBox = document.getElementById('reports-full');
   const guestBox = document.getElementById('reports-guest');
-  if(!fullBox || !guestBox) return;
-  fullBox.style.display = isAuthed ? 'block' : 'none';
-  guestBox.style.display = isAuthed ? 'none' : 'block';
+  const restrictedBox = document.getElementById('reports-restricted');
+  if(!fullBox || !guestBox || !restrictedBox) return;
+  const isAdmin = isAuthed && userRole === 'admin';
+  const isMaintenance = isAuthed && userRole === 'maintenance';
+  fullBox.style.display = isAdmin ? 'block' : 'none';
+  guestBox.style.display = (!isAdmin && !isMaintenance) ? 'block' : 'none';
+  restrictedBox.style.display = isMaintenance ? 'block' : 'none';
 }
 
 /* ---------------- init ---------------- */
