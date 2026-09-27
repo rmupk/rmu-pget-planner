@@ -4,6 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>Venue Management System — RMU PGET</title>
+
+<script>
+  // Self-healing cache check: GitHub Pages' CDN can serve a stale cached copy
+  // of this page on a plain (re)launch. This quietly checks version.txt on
+  // every load (bypassing cache for that check) and force-reloads once if a
+  // newer build is live, so people never get stuck on an old version.
+  (function(){
+    var APP_VERSION = '2026-09-27-2';
+    try{
+      var params = new URL(location.href).searchParams;
+      if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
+      fetch('version.txt?_=' + Date.now(), { cache: 'no-store' })
+        .then(function(r){ return r.ok ? r.text() : null; })
+        .then(function(v){
+          v = v && v.trim();
+          if(v && v !== APP_VERSION){
+            var url = new URL(location.href);
+            url.searchParams.set('v', v);
+            location.replace(url.toString());
+          }
+        })
+        .catch(function(){ /* offline or blocked — keep showing current copy */ });
+    }catch(e){}
+  })();
+</script>
 <meta name="theme-color" content="#0C4A37">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -444,6 +469,10 @@
     padding:7px 12px calc(7px + env(safe-area-inset-bottom));
     background:var(--paper); border-top:1px solid var(--line); flex-shrink:0;
   }
+  .offline-banner{
+    display:none; text-align:center; font-size:11.5px; font-weight:700; color:#3a2d0f;
+    background:var(--gold-soft); padding:8px 14px; border-bottom:1px solid var(--gold);
+  }
   .scroll-fabs{
     position:absolute; right:14px; bottom:112px; z-index:40;
     display:flex; flex-direction:column; gap:9px;
@@ -528,6 +557,10 @@
       </div>
     </div>
   </header>
+
+  <div class="offline-banner" id="offline-banner">
+    You're offline — changes are saved on this device and will sync automatically once you're back online.
+  </div>
 
   <main>
 
@@ -882,6 +915,12 @@ try{
   db = firebase.firestore();
   hallsCollection = db.collection('halls');
   firebaseReady = true;
+  // Offline persistence: queued writes made while offline are cached locally
+  // (IndexedDB) and automatically resent to Firestore once the connection
+  // returns — no data is lost by working offline.
+  db.enablePersistence({ synchronizeTabs: true }).catch(function(err){
+    console.warn('Offline persistence not enabled:', err.code);
+  });
 }catch(err){
   console.error(err);
 }
@@ -1709,6 +1748,15 @@ function updatePgetCountdown(){
 }
 updatePgetCountdown();
 setInterval(updatePgetCountdown, 3600000);
+
+function updateOnlineStatus(){
+  const banner = document.getElementById('offline-banner');
+  if(!banner) return;
+  banner.style.display = navigator.onLine ? 'none' : 'block';
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
 
 /* ---------------- Android/back-button handling ---------------- */
 // One buffer entry so the hardware back button always triggers popstate at
