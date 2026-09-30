@@ -11,7 +11,7 @@
   // every load (bypassing cache for that check) and force-reloads once if a
   // newer build is live, so people never get stuck on an old version.
   (function(){
-    var APP_VERSION = '2026-09-27-3';
+    var APP_VERSION = '2026-09-27-4';
     try{
       var params = new URL(location.href).searchParams;
       if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
@@ -828,6 +828,15 @@
       <h2 class="section-title">Reports</h2>
       <p class="section-hint">Export every surveyed hall as a spreadsheet or a printable PDF report.</p>
 
+      <div class="field">
+        <label>Sort halls by</label>
+        <select id="report-sort" onchange="onReportSortChange()">
+          <option value="name">Hall Name (A–Z)</option>
+          <option value="capacity">Seating Capacity (High to Low)</option>
+          <option value="facilities">Facilities (Most to Least)</option>
+        </select>
+      </div>
+
       <div id="reports-full">
         <button class="report-btn excel" onclick="exportExcel()">
           <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l6 6M15 13l-6 6"/></svg></span>
@@ -941,6 +950,7 @@ let halls = [];
 let editingId = null;
 let editingActiveState = true;
 let recordsFilter = 'all'; // 'all' | 'issues' | 'badfans' | 'badacs' | 'ready'
+let reportSortBy = 'name'; // 'name' | 'capacity' | 'facilities'
 let unsubscribeHalls = null;
 let isAuthed = false;
 let onDashboard = true;
@@ -1568,7 +1578,7 @@ function renderRecords(){
 
 function renderPreview(){
   const wrap = document.getElementById('preview-wrap');
-  const activeHalls = halls.filter(h => h.active !== false);
+  const activeHalls = sortHalls(halls.filter(h => h.active !== false));
   if(activeHalls.length === 0){
     wrap.innerHTML = '<p class="section-hint" style="margin:0;">No active halls to report yet.</p>';
     return;
@@ -1612,11 +1622,40 @@ function getHallTotals(h){
   return { benchCapacity, chairCount };
 }
 
+function facilitiesScore(h){
+  let score = 0;
+  if(h.water) score++;
+  if(h.signage) score++;
+  if(h.siteReady) score++;
+  if(h.lights === 'All Working') score++;
+  if(h.fansNonWorking === 0) score++;
+  if(h.acNonWorking === 0) score++;
+  if(!(h.repairs && h.repairs.length)) score++;
+  return score;
+}
+
+function sortHalls(list){
+  const arr = list.slice();
+  if(reportSortBy === 'capacity'){
+    arr.sort((a,b) => b.capacity - a.capacity || a.hallName.localeCompare(b.hallName));
+  } else if(reportSortBy === 'facilities'){
+    arr.sort((a,b) => facilitiesScore(b) - facilitiesScore(a) || a.hallName.localeCompare(b.hallName));
+  } else {
+    arr.sort((a,b) => a.hallName.localeCompare(b.hallName));
+  }
+  return arr;
+}
+
+function onReportSortChange(){
+  reportSortBy = document.getElementById('report-sort').value;
+  renderPreview();
+}
+
 /* ---------------- export: excel ---------------- */
 function exportExcel(){
   if(!isAuthed){ openLoginModal(); return; }
   if(userRole !== 'admin'){ showToast('Only Admins can export Excel'); return; }
-  const activeHalls = halls.filter(h => h.active !== false);
+  const activeHalls = sortHalls(halls.filter(h => h.active !== false));
   if(activeHalls.length === 0){ showToast('No active halls to export yet'); return; }
   const rows = activeHalls.map(h => {
     const t = getHallTotals(h);
@@ -1665,7 +1704,7 @@ function exportExcel(){
 function exportPDF(){
   if(!isAuthed){ openLoginModal(); return; }
   if(userRole !== 'admin'){ showToast('Only Admins can export the full PDF report'); return; }
-  const activeHalls = halls.filter(h => h.active !== false);
+  const activeHalls = sortHalls(halls.filter(h => h.active !== false));
   if(activeHalls.length === 0){ showToast('No active halls to export yet'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape' });
@@ -1721,7 +1760,7 @@ function exportPDF(){
 
 /* ---------------- export: PDF (viewer/guest summary) ---------------- */
 function exportPDFPublic(){
-  const activeHalls = halls.filter(h => h.active !== false);
+  const activeHalls = sortHalls(halls.filter(h => h.active !== false));
   if(activeHalls.length === 0){ showToast('No active halls to export yet'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait' });
