@@ -11,7 +11,7 @@
   // every load (bypassing cache for that check) and force-reloads once if a
   // newer build is live, so people never get stuck on an old version.
   (function(){
-    var APP_VERSION = '2026-09-27-2';
+    var APP_VERSION = '2026-09-27-3';
     try{
       var params = new URL(location.href).searchParams;
       if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
@@ -330,6 +330,7 @@
     transition: transform .12s ease;
   }
   .record-card:active{ transform: scale(0.985); }
+  .record-card.record-disabled{ opacity:0.6; background:#F1EEE3; }
   .record-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
   .record-top h3{ font-family:'Fraunces', serif; font-size:16px; margin:0; color:var(--deep); }
   .record-top .floor-chip{
@@ -938,6 +939,7 @@ function showConnectionError(){
 
 let halls = [];
 let editingId = null;
+let editingActiveState = true;
 let recordsFilter = 'all'; // 'all' | 'issues' | 'badfans' | 'badacs' | 'ready'
 let unsubscribeHalls = null;
 let isAuthed = false;
@@ -1233,6 +1235,7 @@ function setRepairs(list){
 
 function clearForm(){
   editingId = null;
+  editingActiveState = true;
   document.getElementById('survey-title').textContent = 'Hall Survey';
   document.getElementById('btn-save').textContent = 'Save Hall';
   ['f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-chairCount','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
@@ -1280,6 +1283,7 @@ async function saveRecord(){
 
   const record = {
     id: editingId || ('h' + Date.now()),
+    active: editingId ? editingActiveState : true,
     hallName: document.getElementById('f-hallName').value.trim(),
     floor: document.getElementById('f-floor').value.trim(),
     benchRows: parseFloat(document.getElementById('f-benchRows').value) || 0,
@@ -1319,6 +1323,7 @@ function editRecord(id){
   const h = halls.find(x => x.id === id);
   if(!h) return;
   editingId = id;
+  editingActiveState = (h.active !== false);
   document.getElementById('survey-title').textContent = 'Edit Hall';
   document.getElementById('btn-save').textContent = 'Update Hall';
   document.getElementById('f-hallName').value = h.hallName;
@@ -1400,6 +1405,24 @@ async function deleteRecord(id, evt){
   showToast('Hall deleted');
 }
 
+async function toggleHallActive(id, currentlyActive, evt){
+  if(evt) evt.stopPropagation();
+  if(!isAuthed){ openLoginModal(); return; }
+  if(userRole !== 'admin' && userRole !== 'user'){
+    showToast('Only Admins and Users can enable/disable a hall');
+    return;
+  }
+  try{
+    await hallsCollection.doc(id).update({
+      active: !currentlyActive,
+      updatedAt: new Date().toISOString()
+    });
+    showToast(currentlyActive ? 'Hall disabled for this exam' : 'Hall enabled');
+  }catch(e){
+    showToast('Could not update — please retry');
+  }
+}
+
 /* ---------------- rendering ---------------- */
 function renderAll(){
   renderDashboard();
@@ -1408,10 +1431,11 @@ function renderAll(){
 }
 
 function renderDashboard(){
-  document.getElementById('stat-halls').textContent = halls.length;
-  document.getElementById('stat-capacity').textContent = halls.reduce((s,h) => s + h.capacity, 0);
-  const badFansHalls = halls.filter(h => h.fansNonWorking > 0);
-  const badAcsHalls = halls.filter(h => h.acNonWorking > 0);
+  const activeHalls = halls.filter(h => h.active !== false);
+  document.getElementById('stat-halls').textContent = activeHalls.length;
+  document.getElementById('stat-capacity').textContent = activeHalls.reduce((s,h) => s + h.capacity, 0);
+  const badFansHalls = activeHalls.filter(h => h.fansNonWorking > 0);
+  const badAcsHalls = activeHalls.filter(h => h.acNonWorking > 0);
   const totalBadFans = badFansHalls.reduce((s,h) => s + h.fansNonWorking, 0);
   const totalBadAcs = badAcsHalls.reduce((s,h) => s + h.acNonWorking, 0);
   document.getElementById('stat-badfans').innerHTML = badFansHalls.length
@@ -1419,11 +1443,11 @@ function renderDashboard(){
   document.getElementById('stat-badacs').innerHTML = badAcsHalls.length
     + (totalBadAcs > 0 ? ` <span class="val-sub">(${totalBadAcs})</span>` : '');
 
-  const issues = halls.filter(isHallFlagged);
+  const issues = activeHalls.filter(isHallFlagged);
   document.getElementById('stat-issues').textContent = issues.length;
-  document.getElementById('stat-ready').textContent = halls.filter(h => h.siteReady).length;
+  document.getElementById('stat-ready').textContent = activeHalls.filter(h => h.siteReady).length;
 
-  const pendingMaint = halls.filter(h => h.repairs && h.repairs.length > 0);
+  const pendingMaint = activeHalls.filter(h => h.repairs && h.repairs.length > 0);
   const awaitingVerification = pendingMaint.filter(h => h.maintenanceCompleted).length;
   const maintTile = document.getElementById('maint-alert-tile');
   const maintHeadline = document.getElementById('maint-alert-headline');
@@ -1441,12 +1465,14 @@ function renderDashboard(){
   }
 
   const list = document.getElementById('attention-list');
-  if(halls.length === 0){
-    list.innerHTML = '<div class="empty-note">No halls surveyed yet. Tap "Add New Hall" to begin.</div>';
+  if(activeHalls.length === 0){
+    list.innerHTML = halls.length === 0
+      ? '<div class="empty-note">No halls surveyed yet. Tap "Add New Hall" to begin.</div>'
+      : '<div class="empty-note">All halls are currently disabled for this exam.</div>';
     return;
   }
   if(issues.length === 0){
-    list.innerHTML = '<div class="empty-note">All surveyed halls are in good working order.</div>';
+    list.innerHTML = '<div class="empty-note">All active halls are in good working order.</div>';
     return;
   }
   list.innerHTML = issues.map(h => {
@@ -1486,11 +1512,12 @@ function renderRecords(){
   }
 
   let base = halls;
-  if(recordsFilter === 'badfans') base = halls.filter(h => h.fansNonWorking > 0);
-  if(recordsFilter === 'badacs') base = halls.filter(h => h.acNonWorking > 0);
-  if(recordsFilter === 'issues') base = halls.filter(isHallFlagged);
-  if(recordsFilter === 'ready') base = halls.filter(h => h.siteReady);
-  if(recordsFilter === 'pendingmaint') base = halls.filter(h => h.repairs && h.repairs.length > 0);
+  const activeHalls = halls.filter(h => h.active !== false);
+  if(recordsFilter === 'badfans') base = activeHalls.filter(h => h.fansNonWorking > 0);
+  if(recordsFilter === 'badacs') base = activeHalls.filter(h => h.acNonWorking > 0);
+  if(recordsFilter === 'issues') base = activeHalls.filter(isHallFlagged);
+  if(recordsFilter === 'ready') base = activeHalls.filter(h => h.siteReady);
+  if(recordsFilter === 'pendingmaint') base = activeHalls.filter(h => h.repairs && h.repairs.length > 0);
 
   const filtered = base.filter(h => (h.hallName + ' ' + h.floor).toLowerCase().includes(q));
 
@@ -1504,12 +1531,15 @@ function renderRecords(){
       : '<div class="empty-note">No halls match your search.</div>';
     return;
   }
-  list.innerHTML = filtered.map(h => `
-    <div class="record-card" onclick="editRecord('${h.id}')">
+  list.innerHTML = filtered.map(h => {
+    const isActive = h.active !== false;
+    return `
+    <div class="record-card${isActive ? '' : ' record-disabled'}" onclick="editRecord('${h.id}')">
       <div class="record-top">
         <h3>${escapeHtml(h.hallName)}</h3>
         <span class="floor-chip">${escapeHtml(h.floor || '—')}</span>
       </div>
+      ${isActive ? '' : '<div class="chip warn" style="margin-bottom:8px; display:inline-block;">Disabled for this exam</div>'}
       <div class="record-cap">Seating capacity: <b>${h.capacity}</b>${(() => {
         const t = getHallTotals(h);
         const parts = [];
@@ -1527,24 +1557,47 @@ function renderRecords(){
         <span class="chip ${(h.repairs && h.repairs.length) ? 'warn' : 'ok'}">${(h.repairs && h.repairs.length) ? 'Repairs: ' + h.repairs.join(', ') : 'No repairs needed'}</span>
         ${(h.repairs && h.repairs.length) ? `<span class="chip ${h.maintenanceCompleted ? 'ok' : 'warn'}">${h.maintenanceCompleted ? 'Maintenance completed' : 'Maintenance pending'}</span>` : ''}
       </div>
-      <div style="text-align:right; margin-top:10px;">
+      <div style="display:flex; justify-content:flex-end; gap:14px; margin-top:10px;">
+        ${(userRole === 'admin' || userRole === 'user') ? `<button onclick="toggleHallActive('${h.id}', ${isActive}, event)" style="background:none;border:none;color:${isActive ? '#9c7420' : '#1f6b4f'};font-size:12px;font-weight:700;cursor:pointer;">${isActive ? 'Disable' : 'Enable'}</button>` : ''}
         ${userRole === 'admin' ? `<button onclick="deleteRecord('${h.id}', event)" style="background:none;border:none;color:#A6432F;font-size:12px;font-weight:700;cursor:pointer;">Delete</button>` : ''}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderPreview(){
   const wrap = document.getElementById('preview-wrap');
-  if(halls.length === 0){
-    wrap.innerHTML = '<p class="section-hint" style="margin:0;">No halls surveyed yet.</p>';
+  const activeHalls = halls.filter(h => h.active !== false);
+  if(activeHalls.length === 0){
+    wrap.innerHTML = '<p class="section-hint" style="margin:0;">No active halls to report yet.</p>';
     return;
   }
-  wrap.innerHTML = `<table class="summary-table">
-    <tr><th>Hall</th><th>Floor</th><th>Capacity</th></tr>
-    ${halls.map(h => `<tr><td>${escapeHtml(h.hallName)}</td><td>${escapeHtml(h.floor||'—')}</td><td>${h.capacity}</td></tr>`).join('')}
-    <tr><td colspan="2" style="font-weight:700;">Total</td><td style="font-weight:700;">${halls.reduce((s,h)=>s+h.capacity,0)}</td></tr>
-  </table>`;
+  wrap.innerHTML = `<p class="section-hint" style="margin:0 0 10px;">Uncheck any hall to exclude it from the selected total below. Reports export every active hall regardless of this selection.</p>
+    <table class="summary-table">
+    <tr><th></th><th>Hall</th><th>Floor</th><th>Capacity</th></tr>
+    ${activeHalls.map(h => `<tr>
+      <td><input type="checkbox" class="preview-check" data-capacity="${h.capacity}" checked onchange="updateSelectedTotal()"></td>
+      <td>${escapeHtml(h.hallName)}</td><td>${escapeHtml(h.floor||'—')}</td><td>${h.capacity}</td>
+    </tr>`).join('')}
+    <tr><td></td><td colspan="2" style="font-weight:700;">All Active Halls Total</td><td style="font-weight:700;">${activeHalls.reduce((s,h)=>s+h.capacity,0)}</td></tr>
+  </table>
+  <div class="calc-readout" style="margin-top:12px;">
+    <div>
+      <div class="n" id="preview-selected-total">${activeHalls.reduce((s,h)=>s+h.capacity,0)}</div>
+      <div class="t" id="preview-selected-count">${activeHalls.length} OF ${activeHalls.length} HALLS SELECTED</div>
+    </div>
+  </div>`;
+}
+
+function updateSelectedTotal(){
+  const boxes = document.querySelectorAll('.preview-check');
+  let total = 0, checkedCount = 0;
+  boxes.forEach(b => { if(b.checked){ total += parseFloat(b.dataset.capacity) || 0; checkedCount++; } });
+  const totalEl = document.getElementById('preview-selected-total');
+  const countEl = document.getElementById('preview-selected-count');
+  if(totalEl) totalEl.textContent = total;
+  if(countEl) countEl.textContent = `${checkedCount} OF ${boxes.length} HALLS SELECTED`;
 }
 
 function escapeHtml(s){
@@ -1563,8 +1616,9 @@ function getHallTotals(h){
 function exportExcel(){
   if(!isAuthed){ openLoginModal(); return; }
   if(userRole !== 'admin'){ showToast('Only Admins can export Excel'); return; }
-  if(halls.length === 0){ showToast('No records to export yet'); return; }
-  const rows = halls.map(h => {
+  const activeHalls = halls.filter(h => h.active !== false);
+  if(activeHalls.length === 0){ showToast('No active halls to export yet'); return; }
+  const rows = activeHalls.map(h => {
     const t = getHallTotals(h);
     return {
       'Hall Name': h.hallName,
@@ -1586,9 +1640,9 @@ function exportExcel(){
       'Last Updated': new Date(h.updatedAt).toLocaleString()
     };
   });
-  const totalBenchCap = halls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
-  const totalChairs = halls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
-  const totalCapacity = halls.reduce((s,h) => s + h.capacity, 0);
+  const totalBenchCap = activeHalls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
+  const totalChairs = activeHalls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
+  const totalCapacity = activeHalls.reduce((s,h) => s + h.capacity, 0);
   rows.push({
     'Hall Name': 'Aggregate (All Venues)',
     'Floor': '',
@@ -1611,7 +1665,8 @@ function exportExcel(){
 function exportPDF(){
   if(!isAuthed){ openLoginModal(); return; }
   if(userRole !== 'admin'){ showToast('Only Admins can export the full PDF report'); return; }
-  if(halls.length === 0){ showToast('No records to export yet'); return; }
+  const activeHalls = halls.filter(h => h.active !== false);
+  if(activeHalls.length === 0){ showToast('No active halls to export yet'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape' });
 
@@ -1625,12 +1680,12 @@ function exportPDF(){
   doc.setFontSize(9);
   doc.text('Generated on ' + new Date().toLocaleString(), 14, 17);
 
-  const totalCapacity = halls.reduce((s,h) => s + h.capacity, 0);
-  const totalBenchCap = halls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
-  const totalChairs = halls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
+  const totalCapacity = activeHalls.reduce((s,h) => s + h.capacity, 0);
+  const totalBenchCap = activeHalls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
+  const totalChairs = activeHalls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
   doc.setTextColor(30,30,30);
   doc.setFontSize(10);
-  doc.text(`Halls surveyed: ${halls.length}     Total benches capacity: ${totalBenchCap}     Total chairs required: ${totalChairs}     Total seating capacity: ${totalCapacity}`, 14, 30);
+  doc.text(`Halls surveyed: ${activeHalls.length}     Total benches capacity: ${totalBenchCap}     Total chairs required: ${totalChairs}     Total seating capacity: ${totalCapacity}`, 14, 30);
 
   doc.autoTable({
     startY: 35,
@@ -1639,7 +1694,7 @@ function exportPDF(){
     alternateRowStyles: { fillColor: [244,241,232] },
     head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity',
               'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
-    body: halls.map(h => {
+    body: activeHalls.map(h => {
       const t = getHallTotals(h);
       return [
         h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity,
@@ -1666,7 +1721,8 @@ function exportPDF(){
 
 /* ---------------- export: PDF (viewer/guest summary) ---------------- */
 function exportPDFPublic(){
-  if(halls.length === 0){ showToast('No records to export yet'); return; }
+  const activeHalls = halls.filter(h => h.active !== false);
+  if(activeHalls.length === 0){ showToast('No active halls to export yet'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait' });
 
@@ -1682,11 +1738,11 @@ function exportPDFPublic(){
 
   doc.setTextColor(30,30,30);
   doc.setFontSize(10);
-  doc.text(`Halls surveyed: ${halls.length}`, 14, 30);
+  doc.text(`Halls surveyed: ${activeHalls.length}`, 14, 30);
 
-  const totalBench = halls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
-  const totalChairs = halls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
-  const totalCapacity = halls.reduce((s,h) => s + h.capacity, 0);
+  const totalBench = activeHalls.reduce((s,h) => s + getHallTotals(h).benchCapacity, 0);
+  const totalChairs = activeHalls.reduce((s,h) => s + getHallTotals(h).chairCount, 0);
+  const totalCapacity = activeHalls.reduce((s,h) => s + h.capacity, 0);
 
   doc.autoTable({
     startY: 36,
@@ -1694,7 +1750,7 @@ function exportPDFPublic(){
     headStyles: { fillColor: [12,74,55], textColor: 255 },
     alternateRowStyles: { fillColor: [244,241,232] },
     head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity' ]],
-    body: halls.map(h => {
+    body: activeHalls.map(h => {
       const t = getHallTotals(h);
       return [ h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity ];
     }),
