@@ -11,7 +11,7 @@
   // every load (bypassing cache for that check) and force-reloads once if a
   // newer build is live, so people never get stuck on an old version.
   (function(){
-    var APP_VERSION = '2026-09-27-4';
+    var APP_VERSION = '2026-09-27-5';
     try{
       var params = new URL(location.href).searchParams;
       if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
@@ -607,9 +607,17 @@
             <label>Hall name</label>
             <input type="text" id="f-hallName" placeholder="e.g. Anatomy Hall, New Block">
           </div>
-          <div class="field" style="margin-bottom:0;">
+          <div class="field">
             <label>Floor</label>
             <input type="text" id="f-floor" placeholder="e.g. Ground, 1st Floor">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Hall designated for</label>
+            <select id="f-gender">
+              <option value="">Not specified</option>
+              <option value="boys">For Boys</option>
+              <option value="girls">For Girls</option>
+            </select>
           </div>
         </fieldset>
       </div>
@@ -834,6 +842,7 @@
           <option value="name">Hall Name (A–Z)</option>
           <option value="capacity">Seating Capacity (High to Low)</option>
           <option value="facilities">Facilities (Most to Least)</option>
+          <option value="gender">Designation (Boys / Girls)</option>
         </select>
       </div>
 
@@ -1250,6 +1259,7 @@ function clearForm(){
   document.getElementById('btn-save').textContent = 'Save Hall';
   ['f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-chairCount','f-fansTotal','f-fansWorking','f-acTotal','f-acWorking','f-remarks']
     .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-gender').value = '';
   document.getElementById('f-correction').value = '0';
   document.getElementById('f-lights').value = 'All Working';
   document.getElementById('f-water').checked = false;
@@ -1296,6 +1306,7 @@ async function saveRecord(){
     active: editingId ? editingActiveState : true,
     hallName: document.getElementById('f-hallName').value.trim(),
     floor: document.getElementById('f-floor').value.trim(),
+    gender: document.getElementById('f-gender').value,
     benchRows: parseFloat(document.getElementById('f-benchRows').value) || 0,
     benchCols: parseFloat(document.getElementById('f-benchCols').value) || 0,
     benchCap: parseFloat(document.getElementById('f-benchCap').value) || 0,
@@ -1338,6 +1349,7 @@ function editRecord(id){
   document.getElementById('btn-save').textContent = 'Update Hall';
   document.getElementById('f-hallName').value = h.hallName;
   document.getElementById('f-floor').value = h.floor;
+  document.getElementById('f-gender').value = h.gender || '';
 
   // Support the oldest single-type records, the prior rows/cols chair model, and the current exact-count chair model
   const isOldest = h.benchRows === undefined;
@@ -1386,7 +1398,7 @@ function editRecord(id){
 }
 
 const LOCKABLE_FIELD_IDS = [
-  'f-hallName','f-floor','f-benchRows','f-benchCols','f-benchCap','f-correction',
+  'f-hallName','f-floor','f-gender','f-benchRows','f-benchCols','f-benchCap','f-correction',
   'f-chairCount','f-fansTotal','f-fansWorking','f-lights','f-acTotal','f-acWorking',
   'f-water','f-signage','f-siteReady','f-remarks',
   'f-repair-electrical','f-repair-seats','f-repair-structure'
@@ -1549,6 +1561,7 @@ function renderRecords(){
         <h3>${escapeHtml(h.hallName)}</h3>
         <span class="floor-chip">${escapeHtml(h.floor || '—')}</span>
       </div>
+      ${h.gender ? `<div class="chip ok" style="margin-bottom:8px; display:inline-block;">${h.gender === 'boys' ? 'For Boys' : 'For Girls'}</div>` : ''}
       ${isActive ? '' : '<div class="chip warn" style="margin-bottom:8px; display:inline-block;">Disabled for this exam</div>'}
       <div class="record-cap">Seating capacity: <b>${h.capacity}</b>${(() => {
         const t = getHallTotals(h);
@@ -1585,12 +1598,12 @@ function renderPreview(){
   }
   wrap.innerHTML = `<p class="section-hint" style="margin:0 0 10px;">Uncheck any hall to exclude it from the selected total below. Reports export every active hall regardless of this selection.</p>
     <table class="summary-table">
-    <tr><th></th><th>Hall</th><th>Floor</th><th>Capacity</th></tr>
+    <tr><th></th><th>Hall</th><th>Floor</th><th>For</th><th>Capacity</th></tr>
     ${activeHalls.map(h => `<tr>
       <td><input type="checkbox" class="preview-check" data-capacity="${h.capacity}" checked onchange="updateSelectedTotal()"></td>
-      <td>${escapeHtml(h.hallName)}</td><td>${escapeHtml(h.floor||'—')}</td><td>${h.capacity}</td>
+      <td>${escapeHtml(h.hallName)}</td><td>${escapeHtml(h.floor||'—')}</td><td>${genderLabel(h)}</td><td>${h.capacity}</td>
     </tr>`).join('')}
-    <tr><td></td><td colspan="2" style="font-weight:700;">All Active Halls Total</td><td style="font-weight:700;">${activeHalls.reduce((s,h)=>s+h.capacity,0)}</td></tr>
+    <tr><td></td><td colspan="3" style="font-weight:700;">All Active Halls Total</td><td style="font-weight:700;">${activeHalls.reduce((s,h)=>s+h.capacity,0)}</td></tr>
   </table>
   <div class="calc-readout" style="margin-top:12px;">
     <div>
@@ -1634,12 +1647,23 @@ function facilitiesScore(h){
   return score;
 }
 
+function genderLabel(h){
+  return h.gender === 'boys' ? 'Boys' : h.gender === 'girls' ? 'Girls' : 'Not Specified';
+}
+
 function sortHalls(list){
   const arr = list.slice();
   if(reportSortBy === 'capacity'){
     arr.sort((a,b) => b.capacity - a.capacity || a.hallName.localeCompare(b.hallName));
   } else if(reportSortBy === 'facilities'){
     arr.sort((a,b) => facilitiesScore(b) - facilitiesScore(a) || a.hallName.localeCompare(b.hallName));
+  } else if(reportSortBy === 'gender'){
+    const rank = { boys: 0, girls: 1 };
+    arr.sort((a,b) => {
+      const ra = rank[a.gender] !== undefined ? rank[a.gender] : 2;
+      const rb = rank[b.gender] !== undefined ? rank[b.gender] : 2;
+      return ra - rb || a.hallName.localeCompare(b.hallName);
+    });
   } else {
     arr.sort((a,b) => a.hallName.localeCompare(b.hallName));
   }
@@ -1662,6 +1686,7 @@ function exportExcel(){
     return {
       'Hall Name': h.hallName,
       'Floor': h.floor,
+      'Designated For': genderLabel(h),
       'Total Benches Capacity': t.benchCapacity,
       'Total Chairs': t.chairCount,
       'Total Seating Capacity': h.capacity,
@@ -1685,6 +1710,7 @@ function exportExcel(){
   rows.push({
     'Hall Name': 'Aggregate (All Venues)',
     'Floor': '',
+    'Designated For': '',
     'Total Benches Capacity': totalBenchCap,
     'Total Chairs': totalChairs,
     'Total Seating Capacity': totalCapacity,
@@ -1731,19 +1757,19 @@ function exportPDF(){
     styles: { fontSize: 7.5, cellPadding: 2 },
     headStyles: { fillColor: [12,74,55], textColor: 255 },
     alternateRowStyles: { fillColor: [244,241,232] },
-    head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity',
+    head: [[ 'Hall', 'Floor', 'For', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity',
               'Fans (W/T)', 'Non-W Fans', 'Lights', 'ACs (W/T)', 'Non-W ACs', 'Signage', 'Site Ready', 'Repairs Required', 'Remarks' ]],
     body: activeHalls.map(h => {
       const t = getHallTotals(h);
       return [
-        h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity,
+        h.hallName, h.floor, genderLabel(h), t.benchCapacity, t.chairCount, h.capacity,
         `${h.fansWorking}/${h.fansTotal}`, h.fansNonWorking, h.lights,
         `${h.acWorking}/${h.acTotal}`, h.acNonWorking,
         h.signage ? 'Yes' : 'No', h.siteReady ? 'Yes' : 'No',
         (h.repairs && h.repairs.length) ? h.repairs.join(', ') : 'None', h.remarks || ''
       ];
     }),
-    foot: [[ 'Aggregate (All Venues)', '', totalBenchCap, totalChairs, totalCapacity, '', '', '', '', '', '', '', '', '' ]],
+    foot: [[ 'Aggregate (All Venues)', '', '', totalBenchCap, totalChairs, totalCapacity, '', '', '', '', '', '', '', '', '' ]],
     footStyles: { fillColor: [199,154,62], textColor: [12,74,55], fontStyle: 'bold' },
     didDrawPage: function(){
       const ph = doc.internal.pageSize.getHeight();
@@ -1788,12 +1814,12 @@ function exportPDFPublic(){
     styles: { fontSize: 9, cellPadding: 3 },
     headStyles: { fillColor: [12,74,55], textColor: 255 },
     alternateRowStyles: { fillColor: [244,241,232] },
-    head: [[ 'Hall', 'Floor', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity' ]],
+    head: [[ 'Hall', 'Floor', 'For', 'Total Benches Capacity', 'Total Chairs', 'Total Seating Capacity' ]],
     body: activeHalls.map(h => {
       const t = getHallTotals(h);
-      return [ h.hallName, h.floor, t.benchCapacity, t.chairCount, h.capacity ];
+      return [ h.hallName, h.floor, genderLabel(h), t.benchCapacity, t.chairCount, h.capacity ];
     }),
-    foot: [[ 'Aggregate (All Venues)', '', totalBench, totalChairs, totalCapacity ]],
+    foot: [[ 'Aggregate (All Venues)', '', '', totalBench, totalChairs, totalCapacity ]],
     footStyles: { fillColor: [199,154,62], textColor: [12,74,55], fontStyle: 'bold' },
     didDrawPage: function(){
       const ph = doc.internal.pageSize.getHeight();
