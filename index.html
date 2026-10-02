@@ -11,7 +11,7 @@
   // every load (bypassing cache for that check) and force-reloads once if a
   // newer build is live, so people never get stuck on an old version.
   (function(){
-    var APP_VERSION = '2026-09-27-6';
+    var APP_VERSION = '2026-09-27-7';
     try{
       var params = new URL(location.href).searchParams;
       if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
@@ -1609,7 +1609,7 @@ function renderPreview(){
     <table class="summary-table">
     <tr><th></th><th>Hall</th><th>Floor</th><th>For</th><th>Capacity</th></tr>
     ${activeHalls.map(h => `<tr>
-      <td><input type="checkbox" class="preview-check" data-capacity="${h.capacity}" checked onchange="updateSelectedTotal()"></td>
+      <td><input type="checkbox" class="preview-check" data-capacity="${h.capacity}" data-gender="${h.gender || ''}" checked onchange="updateSelectedTotal()"></td>
       <td>${escapeHtml(h.hallName)}</td><td>${escapeHtml(h.floor||'—')}</td><td>${genderLabel(h)}</td><td>${h.capacity}</td>
     </tr>`).join('')}
     <tr><td></td><td colspan="3" style="font-weight:700;">All Active Halls Total</td><td style="font-weight:700;">${activeHalls.reduce((s,h)=>s+h.capacity,0)}</td></tr>
@@ -1619,17 +1619,44 @@ function renderPreview(){
       <div class="n" id="preview-selected-total">${activeHalls.reduce((s,h)=>s+h.capacity,0)}</div>
       <div class="t" id="preview-selected-count">${activeHalls.length} OF ${activeHalls.length} HALLS SELECTED</div>
     </div>
+  </div>
+  <div class="row-2" style="margin-top:10px;">
+    <div class="calc-readout" style="background:var(--gold-soft);">
+      <div>
+        <div class="n" id="preview-selected-boys" style="color:#9c7420;">0</div>
+        <div class="t" style="color:#9c7420;">SELECTED — FOR BOYS</div>
+      </div>
+    </div>
+    <div class="calc-readout" style="background:var(--gold-soft);">
+      <div>
+        <div class="n" id="preview-selected-girls" style="color:#9c7420;">0</div>
+        <div class="t" style="color:#9c7420;">SELECTED — FOR GIRLS</div>
+      </div>
+    </div>
   </div>`;
+  updateSelectedTotal();
 }
 
 function updateSelectedTotal(){
   const boxes = document.querySelectorAll('.preview-check');
-  let total = 0, checkedCount = 0;
-  boxes.forEach(b => { if(b.checked){ total += parseFloat(b.dataset.capacity) || 0; checkedCount++; } });
+  let total = 0, checkedCount = 0, boysTotal = 0, girlsTotal = 0;
+  boxes.forEach(b => {
+    if(b.checked){
+      const cap = parseFloat(b.dataset.capacity) || 0;
+      total += cap;
+      checkedCount++;
+      if(b.dataset.gender === 'boys') boysTotal += cap;
+      if(b.dataset.gender === 'girls') girlsTotal += cap;
+    }
+  });
   const totalEl = document.getElementById('preview-selected-total');
   const countEl = document.getElementById('preview-selected-count');
+  const boysEl = document.getElementById('preview-selected-boys');
+  const girlsEl = document.getElementById('preview-selected-girls');
   if(totalEl) totalEl.textContent = total;
   if(countEl) countEl.textContent = `${checkedCount} OF ${boxes.length} HALLS SELECTED`;
+  if(boysEl) boysEl.textContent = boysTotal;
+  if(girlsEl) girlsEl.textContent = girlsTotal;
 }
 
 function escapeHtml(s){
