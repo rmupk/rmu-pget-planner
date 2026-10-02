@@ -11,7 +11,7 @@
   // every load (bypassing cache for that check) and force-reloads once if a
   // newer build is live, so people never get stuck on an old version.
   (function(){
-    var APP_VERSION = '2026-09-27-5';
+    var APP_VERSION = '2026-09-27-6';
     try{
       var params = new URL(location.href).searchParams;
       if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
@@ -1343,6 +1343,10 @@ function editRecord(id){
   if(!isAuthed){ openLoginModal(); return; }
   const h = halls.find(x => x.id === id);
   if(!h) return;
+  if(h.active === false && userRole !== 'admin'){
+    showToast('This hall is not available');
+    return;
+  }
   editingId = id;
   editingActiveState = (h.active !== false);
   document.getElementById('survey-title').textContent = 'Edit Hall';
@@ -1430,8 +1434,8 @@ async function deleteRecord(id, evt){
 async function toggleHallActive(id, currentlyActive, evt){
   if(evt) evt.stopPropagation();
   if(!isAuthed){ openLoginModal(); return; }
-  if(userRole !== 'admin' && userRole !== 'user'){
-    showToast('Only Admins and Users can enable/disable a hall');
+  if(userRole !== 'admin'){
+    showToast('Only Admins can enable/disable a hall');
     return;
   }
   try{
@@ -1541,6 +1545,11 @@ function renderRecords(){
   if(recordsFilter === 'ready') base = activeHalls.filter(h => h.siteReady);
   if(recordsFilter === 'pendingmaint') base = activeHalls.filter(h => h.repairs && h.repairs.length > 0);
 
+  // Disabled halls are only ever visible to Admins
+  if(userRole !== 'admin'){
+    base = base.filter(h => h.active !== false);
+  }
+
   const filtered = base.filter(h => (h.hallName + ' ' + h.floor).toLowerCase().includes(q));
 
   if(halls.length === 0){
@@ -1581,7 +1590,7 @@ function renderRecords(){
         ${(h.repairs && h.repairs.length) ? `<span class="chip ${h.maintenanceCompleted ? 'ok' : 'warn'}">${h.maintenanceCompleted ? 'Maintenance completed' : 'Maintenance pending'}</span>` : ''}
       </div>
       <div style="display:flex; justify-content:flex-end; gap:14px; margin-top:10px;">
-        ${(userRole === 'admin' || userRole === 'user') ? `<button onclick="toggleHallActive('${h.id}', ${isActive}, event)" style="background:none;border:none;color:${isActive ? '#9c7420' : '#1f6b4f'};font-size:12px;font-weight:700;cursor:pointer;">${isActive ? 'Disable' : 'Enable'}</button>` : ''}
+        ${userRole === 'admin' ? `<button onclick="toggleHallActive('${h.id}', ${isActive}, event)" style="background:none;border:none;color:${isActive ? '#9c7420' : '#1f6b4f'};font-size:12px;font-weight:700;cursor:pointer;">${isActive ? 'Disable' : 'Enable'}</button>` : ''}
         ${userRole === 'admin' ? `<button onclick="deleteRecord('${h.id}', event)" style="background:none;border:none;color:#A6432F;font-size:12px;font-weight:700;cursor:pointer;">Delete</button>` : ''}
       </div>
     </div>
