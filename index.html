@@ -11,7 +11,7 @@
   // every load (bypassing cache for that check) and force-reloads once if a
   // newer build is live, so people never get stuck on an old version.
   (function(){
-    var APP_VERSION = '2026-09-27-7';
+    var APP_VERSION = '2026-09-27-8';
     try{
       var params = new URL(location.href).searchParams;
       if(params.get('v') === APP_VERSION) return; // already freshly reloaded once
@@ -855,6 +855,11 @@
         <button class="report-btn pdf" onclick="exportPDF()">
           <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h1M9 12h1M9 18h1"/></svg></span>
           <span class="txt"><strong>Export to PDF</strong><span>Full detailed report, ready to share</span></span>
+        </button>
+
+        <button class="report-btn pdf" onclick="exportMaintenancePDF()">
+          <span class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.7 6.3-8.4 8.4a2 2 0 0 0-.5.9L5 19l3.4-.8a2 2 0 0 0 .9-.5l8.4-8.4a2 2 0 0 0 0-2.8l-.2-.2a2 2 0 0 0-2.8 0Z"/></svg></span>
+          <span class="txt"><strong>Maintenance Pending Report</strong><span>Only halls with repairs required, with full details</span></span>
         </button>
       </div>
 
@@ -1818,6 +1823,60 @@ function exportPDF(){
 
   doc.save('RMU_PGET_Hall_Survey_Report.pdf');
   showToast('PDF report downloaded');
+}
+
+/* ---------------- export: PDF (maintenance pending only) ---------------- */
+function exportMaintenancePDF(){
+  if(!isAuthed){ openLoginModal(); return; }
+  if(userRole !== 'admin'){ showToast('Only Admins can export this report'); return; }
+
+  const pendingHalls = sortHalls(
+    halls.filter(h => h.active !== false && h.repairs && h.repairs.length > 0)
+  );
+  if(pendingHalls.length === 0){ showToast('No halls currently have maintenance pending'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  doc.setFillColor(166, 67, 47);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Rawalpindi Medical University — PGET Maintenance Pending Report', 14, 10);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Generated on ' + new Date().toLocaleString(), 14, 17);
+
+  const awaitingVerification = pendingHalls.filter(h => h.maintenanceCompleted).length;
+  doc.setTextColor(30,30,30);
+  doc.setFontSize(10);
+  doc.text(`Halls pending maintenance: ${pendingHalls.length}     Marked complete, awaiting verification: ${awaitingVerification}`, 14, 30);
+
+  doc.autoTable({
+    startY: 35,
+    styles: { fontSize: 8.5, cellPadding: 3 },
+    headStyles: { fillColor: [166,67,47], textColor: 255 },
+    alternateRowStyles: { fillColor: [246,228,223] },
+    head: [[ 'Hall', 'Floor', 'For', 'Repairs Required', 'Maintenance Completed', 'Last Updated', 'Remarks' ]],
+    body: pendingHalls.map(h => [
+      h.hallName, h.floor, genderLabel(h),
+      h.repairs.join(', '),
+      h.maintenanceCompleted ? 'Yes — awaiting verification' : 'No',
+      h.updatedAt ? new Date(h.updatedAt).toLocaleString() : '',
+      h.remarks || ''
+    ]),
+    didDrawPage: function(){
+      const ph = doc.internal.pageSize.getHeight();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(120,120,120);
+      doc.text('© 2026 - Dr. Syed Muhammad Ali,  RMU, Rwp.', 14, ph - 8);
+    }
+  });
+
+  doc.save('RMU_PGET_Maintenance_Pending_Report.pdf');
+  showToast('Maintenance report downloaded');
 }
 
 /* ---------------- export: PDF (viewer/guest summary) ---------------- */
